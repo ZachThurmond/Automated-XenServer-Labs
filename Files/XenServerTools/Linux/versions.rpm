@@ -1,0 +1,2 @@
+XE_GUEST_UTILITIES_PKG_FILE_i386='xe-guest-utilities-7.9.0-1.i386.rpm xe-guest-utilities-xenstore-7.9.0-1.i386.rpm'
+XE_GUEST_UTILITIES_PKG_FILE_x86_64='xe-guest-utilities-7.9.0-1.x86_64.rpm xe-guest-utilities-xenstore-7.9.0-1.x86_64.rpm'

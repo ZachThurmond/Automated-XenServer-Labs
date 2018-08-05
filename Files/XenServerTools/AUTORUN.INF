@@ -1,0 +1,3 @@
+[AutoRun]
+shellexecute=setup.exe /passive
+icon=xenlegacy.exe,0
