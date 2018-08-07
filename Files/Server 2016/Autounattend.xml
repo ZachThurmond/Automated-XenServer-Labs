@@ -33,7 +33,7 @@
                     <InstallFrom>
                         <MetaData wcm:action="add">
                             <Key>/IMAGE/NAME</Key>
-                            <Value>Windows Server 2016 SERVERSTANDARD</Value>
+                            <Value>1Edition</Value>
                         </MetaData>
                     </InstallFrom>
                 </OSImage>
@@ -45,7 +45,6 @@
                 </ProductKey>
                 <AcceptEula>true</AcceptEula>
                 <FullName>1AdminAccount</FullName>
-                <Organization>1Organization</Organization>
             </UserData>
         </component>
         <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -69,7 +68,6 @@
                 <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
                 <ProtectYourPC>1</ProtectYourPC>
             </OOBE>
-            <TimeZone>UTC</TimeZone>
             <UserAccounts>
                 <AdministratorPassword>
                     <Value>1AdminPassword</Value>
@@ -96,6 +94,7 @@
 		<LogonCount>1</LogonCount>
                 <Username>1AdminAccount</Username>
             </AutoLogon>
+	    <TimeZone>1TimeZone</TimeZone>
             <FirstLogonCommands>
                 <SynchronousCommand wcm:action="add">
                     <Order>1</Order>
@@ -103,15 +102,15 @@
                 </SynchronousCommand>
                 <SynchronousCommand wcm:action="add">
                     <Order>2</Order>
-                    <CommandLine>C:\Windows\SysWOW64\cmd /c "Shutdown -r -t 30"</CommandLine>
-                </SynchronousCommand>
-                <SynchronousCommand wcm:action="add">
-                    <Order>3</Order>
                     <CommandLine>C:\Windows\SysWOW64\cmd /c PowerShell -Command "Start-Process -FilePath powershell.exe -Verb RunAs -ArgumentList {(New-Object -ComObject 'Shell.Application').Namespace(17).Items() | Where-Object { $_.Type -eq 'CD Drive' } | foreach { $_.InvokeVerb('Eject')}}"</CommandLine>
                 </SynchronousCommand>
                 <SynchronousCommand wcm:action="add">
-                    <Order>4</Order>
+                    <Order>3</Order>
                     <CommandLine>C:\Windows\SysWOW64\cmd /c PowerShell -Command "Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False"</CommandLine>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>4</Order>
+                    <CommandLine>C:\Windows\SysWOW64\cmd /c "Shutdown -r -t 30"</CommandLine>
                 </SynchronousCommand>
             </FirstLogonCommands>
         </component>
@@ -126,5 +125,4 @@
             <EnableLUA>false</EnableLUA>
         </component>
     </settings>
-    <cpi:offlineImage cpi:source="wim:c:/wim/windows-2016/install.wim#Windows Server 2016 SERVERSTANDARD" xmlns:cpi="urn:schemas-microsoft-com:cpi" />
 </unattend>
