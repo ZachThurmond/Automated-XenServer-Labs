@@ -29,7 +29,7 @@
                     <InstallFrom>
                         <MetaData wcm:action="add">
                             <Key>/IMAGE/NAME</Key>
-                            <Value>Windows Server 2016 SERVERSTANDARD</Value>
+                            <Value>1Edition</Value>
                         </MetaData>
                     </InstallFrom>
                     <InstallTo>
@@ -40,11 +40,11 @@
             </ImageInstall>
             <UserData>
                 <ProductKey>
-                    <Key>BQBXM-N2FXT-9RWM6-PKBPD-63CG4</Key>
+                    <Key>1ProductKey</Key>
                     <WillShowUI>OnError</WillShowUI>
                 </ProductKey>
                 <AcceptEula>true</AcceptEula>
-                <FullName>user</FullName>
+                <FullName>1AdminAccount</FullName>
             </UserData>
         </component>
         <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -70,31 +70,31 @@
             </OOBE>
             <UserAccounts>
                 <AdministratorPassword>
-                    <Value>password</Value>
+                    <Value>1AdminPassword</Value>
                     <PlainText>true</PlainText>
                 </AdministratorPassword>
                 <LocalAccounts>
                     <LocalAccount wcm:action="add">
                         <Password>
-                            <Value>password</Value>
+                            <Value>1AdminPassword</Value>
                             <PlainText>true</PlainText>
                         </Password>
                         <Group>Administrators</Group>
-                        <DisplayName>user</DisplayName>
-                        <Name>user</Name>
+                        <DisplayName>1AdminAccount</DisplayName>
+                        <Name>1AdminAccount</Name>
                     </LocalAccount>
                 </LocalAccounts>
             </UserAccounts>
             <AutoLogon>
                 <Password>
-                    <Value>password</Value>
+                    <Value>1AdminPassword</Value>
 		    <PlainText>true</PlainText>
                 </Password>
-                <Username>user</Username>
+                <Username>1AdminAccount</Username>
 		<LogonCount>2</LogonCount>
                 <Enabled>true</Enabled>
             </AutoLogon>
-	    <TimeZone>Eastern Standard Time</TimeZone>
+	    <TimeZone>1TimeZone</TimeZone>
             <FirstLogonCommands>
                 <SynchronousCommand wcm:action="add">
                     <Order>1</Order>
