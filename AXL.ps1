@@ -2410,32 +2410,34 @@ Function InstallAllServices {
 $NonSubordinates = @()
 $Subordinates = @()
 $AllCAServers = @()
-
+    
+    #Fill arrays with Specified Certificate Authorities
     foreach($CAServer in $CertificateAuthoritiesListBox.Items){
 
         if($Global:CATypes[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)] -notmatch "Subordinate") {
 
-        $Subordinates += $CAServer
+        $NonSubordinates += $CAServer
 
         }
 
         else {
         
-        $NonSubordinates += $CAServer
+        $Subordinates += $CAServer
         
         }
 
     }
 
-    foreach($Subordinate in $Subordinates) {
-    
-    $AllCAServers += $Subordinate
-    
-    }
-
+    #Fill primary array starting with all non-subordinate CAs
     foreach($NonSubordinate in $NonSubordinates) {
     
     $AllCAServers += $NonSubordinate
+    
+    }
+
+    foreach($Subordinate in $Subordinates) {
+    
+    $AllCAServers += $Subordinate
     
     }
 
