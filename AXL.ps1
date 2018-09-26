@@ -1,7 +1,7 @@
 ﻿    If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
 
     #Relaunch PowerShell as an elevated process in order to execute certain commands
-    Start-Process powershell.exe ('{0}' -f $($MyInvocation.MyCommand.Path -replace ' ', '` ')) -WindowStyle Hidden -Verb RunAs
+    Start-Process powershell.exe ('{0}' -f $($MyInvocation.MyCommand.Path -replace ' ', '` ')) -Verb RunAs
     exit
 
     }
@@ -16,7 +16,7 @@ Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName System.Windows.Forms
 
 [System.Collections.ArrayList]$Global:OldIPAddresses = @()
-[System.Collections.ArrayList]$Global:AllCreatedServers = @("W16-DC01","W16-DC02")
+[System.Collections.ArrayList]$Global:AllCreatedServers = @()
 [System.Collections.ArrayList]$Global:DefaultGateways = @()
 [System.Collections.ArrayList]$Global:SubnetMasks = @()
 [System.Collections.ArrayList]$Global:IPAddresses = @()
