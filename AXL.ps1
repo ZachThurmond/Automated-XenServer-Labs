@@ -2435,6 +2435,7 @@ $AllCAServers = @()
     
     }
 
+    #Next, fill primary array with all subordinate CAs
     foreach($Subordinate in $Subordinates) {
     
     $AllCAServers += $Subordinate
@@ -2443,12 +2444,14 @@ $AllCAServers = @()
 
     foreach($CAServer in $AllCAServers){
 
+    #Define necessary connection parameters
     $DomainName = $DomainNameTextBox.Text
     $ConnectionPassword = convertto-securestring -AsPlainText -Force -String $LocalPasswordTextBox.Text
     $DomainAdminCreds = new-object -typename System.Management.Automation.PSCredential -argumentlist "$($DomainName.Remove($DomainName.IndexOf(".")).ToUpper())\Administrator",$ConnectionPassword
 
     $VMStatusTextBox.AppendText("`r`nPromoting $CAServer to a Certificate Authority")
-
+        
+        #If the server is not a subordinate CA, define all parameters
         if($Global:CATypes[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)] -notmatch "Subordinate") {
 
             Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($CAServer)] -credential $DomainAdminCreds -ScriptBlock {
@@ -2461,6 +2464,7 @@ $AllCAServers = @()
 
         }
 
+        #Else, only create a CA using the parent specified and a few other parameters
         else {
 
             Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($CAServer)] -credential $DomainAdminCreds -ScriptBlock {
@@ -2474,7 +2478,8 @@ $AllCAServers = @()
         } 
 
     [System.Windows.Forms.Application]::DoEvents()
-
+        
+        #If the server was chosen as a web enrollment server, install the role
         if($Global:CAWebEnrollment[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)] -eq "Checked") {
 
         $VMStatusTextBox.AppendText("`r`nPromoting $CAServer to a Web Enrollment Server")
@@ -2489,6 +2494,7 @@ $AllCAServers = @()
 
         }
 
+        #If the server was chosen as an online responder, install the role
         if($Global:CAResponder[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)] -eq "Checked") {
 
         $VMStatusTextBox.AppendText("`r`nPromoting $CAServer to an Online Responder")
@@ -3111,17 +3117,16 @@ $CheckStateListView.Hide()
 $VMStatusTextBox.Show()
 
 DomainCreation
-UGOCreation   
+
+    if($Global:OULocation.Count -ge 1 -or $Global:GroupName.Count -ge 1 -or $Global:UserLoginName.Count -ge 1) {
+
+    UGOCreation
+    
+    }
 
     if($CertificateServicesCheckbox.CheckState -eq "Checked") {
             
     CACreation
-            
-    }
-
-    if($SQLCheckbox.CheckState -eq "Checked") {
-            
-    
             
     }
 
