@@ -1,7 +1,7 @@
 ﻿    If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
 
     #Relaunch PowerShell as an elevated process in order to execute certain commands
-    Start-Process powershell.exe ('{0}' -f $($MyInvocation.MyCommand.Path -replace ' ', '` ')) -Verb RunAs
+    Start-Process powershell.exe ('{0}' -f $($MyInvocation.MyCommand.Path -replace ' ', '` ')) -WindowStyle Hidden -Verb RunAs
     exit
 
     }
