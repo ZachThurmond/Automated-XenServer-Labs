@@ -16,7 +16,7 @@ Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName System.Windows.Forms
 
 [System.Collections.ArrayList]$Global:OldIPAddresses = @()
-[System.Collections.ArrayList]$Global:AllCreatedServers = @()
+[System.Collections.ArrayList]$Global:AllCreatedServers = @("W16-DC01","W16-DC02")
 [System.Collections.ArrayList]$Global:DefaultGateways = @()
 [System.Collections.ArrayList]$Global:SubnetMasks = @()
 [System.Collections.ArrayList]$Global:IPAddresses = @()
@@ -2407,7 +2407,39 @@ $VMStatusTextBox.AppendText("`r`n")
 
 Function InstallAllServices {
 
+$NonSubordinates = @()
+$Subordinates = @()
+$AllCAServers = @()
+
     foreach($CAServer in $CertificateAuthoritiesListBox.Items){
+
+        if($Global:CATypes[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)] -notmatch "Subordinate") {
+
+        $Subordinates += $CAServer
+
+        }
+
+        else {
+        
+        $NonSubordinates += $CAServer
+        
+        }
+
+    }
+
+    foreach($Subordinate in $Subordinates) {
+    
+    $AllCAServers += $Subordinate
+    
+    }
+
+    foreach($NonSubordinate in $NonSubordinates) {
+    
+    $AllCAServers += $NonSubordinate
+    
+    }
+
+    foreach($CAServer in $AllCAServers){
 
     $DomainName = $DomainNameTextBox.Text
     $ConnectionPassword = convertto-securestring -AsPlainText -Force -String $LocalPasswordTextBox.Text
@@ -6392,7 +6424,11 @@ $CertificateBuildoutForm.StartPosition = 'CenterScreen'
         $DropDownCAType.Enabled = $False
             $DropDownCAType.Add_SelectedIndexChanged({
 
-            $Global:CATypes[$CertificateAuthoritiesListBox.SelectedIndex] = $DropDownCAType.Text
+                if($DropDownCAType.Text) {
+
+                $Global:CATypes[$CertificateAuthoritiesListBox.SelectedIndex] = $DropDownCAType.Text
+
+                }
 
             $DropDownParentCA.Items.Clear()
 
@@ -6402,18 +6438,39 @@ $CertificateBuildoutForm.StartPosition = 'CenterScreen'
             
                 }
 
-                if($DropDownCAType.Text -match "Subordinate") {
+                if($Global:CATypes[$CertificateAuthoritiesListBox.SelectedIndex] -match "Subordinate") {
             
                 $DropDownParentCA.Enabled = $True
-                
+                $DropDownCryptoProvider.Enabled = $False
+                $DropDownKeyLength.Enabled = $False
+                $DropDownValidityPeriod.Enabled = $False
+                $DropDownValidityPeriodUnits.Enabled = $False
+                $DropDownHashAlgorithm.Enabled = $False
+                $DropDownCryptoProvider.ResetText()
+                $DropDownKeyLength.ResetText()
+                $DropDownValidityPeriod.ResetText()
+                $DropDownValidityPeriodUnits.ResetText()
+                $DropDownHashAlgorithm.ResetText()
+
                 }
 
                 else {
-                
+
                 $DropDownParentCA.ResetText()
+                $DropDownCryptoProvider.Enabled = $True
+                $DropDownKeyLength.Enabled = $True
+                $DropDownValidityPeriod.Enabled = $True
+                $DropDownValidityPeriodUnits.Enabled = $True
+                $DropDownHashAlgorithm.Enabled = $True
                 $Global:ParentCA[$CertificateAuthoritiesListBox.SelectedIndex] = $Null
                 $DropDownParentCA.Enabled = $False
-            
+                $DropDownHashAlgorithm.Text = $Global:CAHashAlgorithm[$CertificateAuthoritiesListBox.SelectedIndex]
+                $DropDownParentCA.Text = $Global:ParentCA[$CertificateAuthoritiesListBox.SelectedIndex]
+                $DropDownCryptoProvider.Text = $Global:CACryptoProvider[$CertificateAuthoritiesListBox.SelectedIndex]
+                $DropDownKeyLength.Text = $Global:CAKeyLength[$CertificateAuthoritiesListBox.SelectedIndex]
+                $DropDownValidityPeriod.Text = $Global:CAValidityPeriod[$CertificateAuthoritiesListBox.SelectedIndex]
+                $DropDownValidityPeriodUnits.Text = $Global:CAValidityPeriodUnits[$CertificateAuthoritiesListBox.SelectedIndex]
+
                 }
             
             $CertificateBuildoutButton.Enabled = $False
@@ -6533,6 +6590,27 @@ $CertificateBuildoutForm.StartPosition = 'CenterScreen'
                 
                 }
 
+                if($Global:CATypes[$CertificateAuthoritiesListBox.SelectedIndex] -match "Subordinate") {
+
+                $CANameTextBox.Text = $Global:CANames[$CertificateAuthoritiesListBox.SelectedIndex]
+                $DropDownCAType.Text = $Global:CATypes[$CertificateAuthoritiesListBox.SelectedIndex]
+                $DropDownParentCA.Text = $Global:ParentCA[$CertificateAuthoritiesListBox.SelectedIndex]                
+                $DropDownParentCA.Enabled = $True
+                $DropDownCryptoProvider.Enabled = $False
+                $DropDownKeyLength.Enabled = $False
+                $DropDownValidityPeriod.Enabled = $False
+                $DropDownValidityPeriodUnits.Enabled = $False
+                $DropDownHashAlgorithm.Enabled = $False
+                $DropDownCryptoProvider.ResetText()
+                $DropDownKeyLength.ResetText()
+                $DropDownValidityPeriod.ResetText()
+                $DropDownValidityPeriodUnits.ResetText()
+                $DropDownHashAlgorithm.ResetText()
+
+                }
+
+                else{
+                
                 $CANameTextBox.Text = $Global:CANames[$CertificateAuthoritiesListBox.SelectedIndex]
                 $DropDownCAType.Text = $Global:CATypes[$CertificateAuthoritiesListBox.SelectedIndex]
                 $DropDownHashAlgorithm.Text = $Global:CAHashAlgorithm[$CertificateAuthoritiesListBox.SelectedIndex]
@@ -6541,6 +6619,14 @@ $CertificateBuildoutForm.StartPosition = 'CenterScreen'
                 $DropDownKeyLength.Text = $Global:CAKeyLength[$CertificateAuthoritiesListBox.SelectedIndex]
                 $DropDownValidityPeriod.Text = $Global:CAValidityPeriod[$CertificateAuthoritiesListBox.SelectedIndex]
                 $DropDownValidityPeriodUnits.Text = $Global:CAValidityPeriodUnits[$CertificateAuthoritiesListBox.SelectedIndex]
+                $DropDownParentCA.Enabled = $False
+                $DropDownCryptoProvider.Enabled = $True
+                $DropDownKeyLength.Enabled = $True
+                $DropDownValidityPeriod.Enabled = $True
+                $DropDownValidityPeriodUnits.Enabled = $True
+                $DropDownHashAlgorithm.Enabled = $True
+                
+                }
 
                 if($Global:CAWebEnrollment[$CertificateAuthoritiesListBox.SelectedIndex]) {
                 
@@ -6563,12 +6649,6 @@ $CertificateBuildoutForm.StartPosition = 'CenterScreen'
                 else {
                 
                 $OnlineResponderCheckbox.CheckState = "Unchecked"
-                
-                }
-
-                if($DropDownCAType.Text -match "Subordinate") {
-                
-                $DropDownParentCA.Enabled = $True
                 
                 }
         
