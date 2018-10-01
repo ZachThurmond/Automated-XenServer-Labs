@@ -1394,6 +1394,7 @@ Function PromotePrimaryDomainController {
 
         WaitJob $DCPromotion
 
+        #If the Domain Controller does not reboot automatically within 15 seconds, reboot the machine
         if(Test-Connection -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DCServer.Replace("*",""))] -Count 1 -ErrorAction SilentlyContinue) {
 
         Invoke-XenVM -Name $DCServer -XenAction CleanReboot
@@ -2981,8 +2982,6 @@ $PrimaryDC = ($DomainControllersListBox.Items | where { $_ -match [regex]"\*" })
                 } -ArgumentList $DFSFolder,$Global:DFSFolderRoot[$Global:DFSFolders.IndexOf($DFSFolder)] -AsJob
 
                 WaitJob $StandaloneFolder
-
-            [System.Windows.Forms.Application]::DoEvents()
             
             }
 
