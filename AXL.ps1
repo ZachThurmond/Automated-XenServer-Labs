@@ -52,6 +52,7 @@ Add-Type -AssemblyName System.Windows.Forms
 [System.Collections.ArrayList]$Global:DFSFolderRoot = @()
 [System.Collections.ArrayList]$Global:DFSFolderTarget = @()
 
+$Global:StopWatch = New-Object -TypeName System.Diagnostics.Stopwatch 
 $Global:XenServerModule = (Get-ChildItem (Get-Location) -Recurse -ErrorAction SilentlyContinue | where {$_.Name -eq "XenServerPowerShell.dll"}).FullName 
 $Global:ISOCreationFormRan = $False
 $Global:IPCounter = 0
@@ -66,17 +67,46 @@ Function CheckServerOnState([string] $CheckComputer) {
 
     while(!(Test-Connection -ComputerName $CheckComputer -Count 1 -ErrorAction SilentlyContinue)) {
 
-    [System.Windows.Forms.Application]::DoEvents()
-    Start-Sleep -s 3
+    WaitScript 3
 
     }
 
     While(!(Test-WSMan -ComputerName $CheckComputer -ErrorAction SilentlyContinue)) {
 
-    [System.Windows.Forms.Application]::DoEvents()
-    Start-Sleep -s 3
+    WaitScript 3
     
     }
+
+}
+
+
+Function WaitJob($Job) {
+
+    While ($Job.State -ne 'Completed') {
+
+    Start-Sleep -Milliseconds 500
+    [System.Windows.Forms.Application]::DoEvents()
+
+    }
+
+}
+
+
+Function WaitScript([int] $Time) {
+
+$WaitStopWatch = New-Object -TypeName System.Diagnostics.Stopwatch 
+
+$WaitStopWatch.Start()
+
+    While($WaitStopWatch.Elapsed.Seconds -ne $Time){
+
+    Start-Sleep -Milliseconds 500
+    [System.Windows.Forms.Application]::DoEvents()
+
+    }
+
+$WaitStopWatch.Stop()
+$WaitStopWatch.Reset()
 
 }
 
@@ -385,13 +415,13 @@ $VMCreationProgressTextBox.AppendText("`r`n====================")
         
         $GetVMProperties = Get-XenVM -Name $VMname
         
-        Start-Sleep -Seconds 1
+        WaitScript 1
 
         # Create a new Virtual Disk with the same name as the new VM
         $VMCreationProgressTextBox.AppendText("`r`nCreating Hard Disk for $VMName")
         New-XenVDI -NameLabel $VMName -VirtualSize $DiskSize -SR $GetSRProperties -Type user
 
-        Start-Sleep -Seconds 4
+        WaitScript 4
 
         # Specify VDI and Network locations
         $NewVDI = Get-XenVDI -Name $VMName
@@ -430,7 +460,7 @@ $VMCreationProgressTextBox.AppendText("`r`n====================")
             # Provision the copy into a VM
             Invoke-XenVM -XenAction Provision -Name $VMName
 
-            Start-Sleep -Seconds 1
+            WaitScript 1
 
             # Rename the attached disk to the name of the VM
             $VMCreationProgressTextBox.AppendText("`r`nRenaming Virtual Disk Attached to $VMName")
@@ -455,7 +485,7 @@ $VMCreationProgressTextBox.AppendText("`r`n====================")
             # Provision the copy into a VM
             Invoke-XenVM -XenAction Provision -Name $VMName
 
-            Start-Sleep -Seconds 1
+            WaitScript 1
 
             # Rename the attached disk to the name of the VM
             $VMCreationProgressTextBox.AppendText("`r`nRenaming Virtual Disk Attached to $VMName")
@@ -492,11 +522,11 @@ $VMCreationProgressTextBox.AppendText("`r`n====================")
     #If a temporary template was created, remove it and the associated disk
     if($SourceTemplateName -match "- TEMP") {
     
-    Start-Sleep -Seconds 1
+    WaitScript 1
     
     $ObjSourceTemplate | Select -ExpandProperty VBDs | Get-XenVBD | where {$_.type -eq "Disk"} | Select -ExpandProperty VDI | Remove-XenVDI
 
-    Start-Sleep -Seconds 1
+    WaitScript 1
 
     $VMCreationProgressTextBox.AppendText("`r`nRemoving Temporary Template $SourceTemplateName")
     Remove-XenVM -Name $SourceTemplateName
@@ -504,6 +534,7 @@ $VMCreationProgressTextBox.AppendText("`r`n====================")
     }
 
 $Global:StartTime = (Get-Date)
+$Global:StopWatch.Start()
 
 }
 
@@ -894,112 +925,183 @@ Function CheckISOCompletionState {
 
 $ISOValidationCount = 0
     
-    if(Test-Path $ISOPathTextBox.Text){
+    if($ISOPathTextBox.Text.Length -ge 1) {
 
-        if($ISOPathTextBox.Text -notmatch [regex]'[a-zA-Z][:][\\]{1}[a-zA-Z0-9\-_.$\\]{1,}' -or $ISOPathTextBox.Text -notmatch [regex]'\\\\(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[a-zA-Z0-9\-_$\\]{1,}' -and $ISOPathTextBox.Text -notmatch ".iso") {
+        if(Test-Path $ISOPathTextBox.Text -ErrorAction SilentlyContinue) {
+
+            if($ISOPathTextBox.Text -notmatch [regex]'[a-zA-Z][:][\\]{1}[a-zA-Z0-9\-_.$\\]{1,}' -or $ISOPathTextBox.Text -notmatch [regex]'\\\\(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[a-zA-Z0-9\-_$\\]{1,}' -and $ISOPathTextBox.Text -notmatch ".iso") {
                 
-        [System.Windows.MessageBox]::Show("Error in ISO Path TextBox: The full path to the ISO must be included as well as the ISO itself")
-        $CreateISOButton.Enabled = $False
+            [System.Windows.MessageBox]::Show("Error in ISO Path TextBox: The full path to the ISO must be included as well as the ISO itself")
+            $CreateISOButton.Enabled = $False
                 
-        }else{ $ISOValidationCount++ }
+            }else{ $ISOValidationCount++ }
 
-    }
-    else{
+        }
+
+        else {
     
-    [System.Windows.MessageBox]::Show("Error in ISO Path TextBox: The path provided does not exist")
+        [System.Windows.MessageBox]::Show("Error in ISO Path TextBox: The path provided does not exist")
 
-    }
-
-
-    if(Test-Path $TargetFolderTextBox.Text){
-
-        if($TargetFolderTextBox.Text -notmatch [regex]'[a-zA-Z][:][\\][a-zA-Z0-9\-_$\\]{1,}' -or $TargetFolderTextBox.Text -notmatch [regex]'\\\\([a-zA-Z0-9\.]{1,3}){4}[a-zA-Z0-9\-_$\\]{1,}' -and $TargetFolderTextBox.Text -notmatch ".") {
-    
-        [System.Windows.MessageBox]::Show("Error in Target Folder TextBox: Only include the path to a folder")
-        $CreateISOButton.Enabled = $False
-
-        }else{ $ISOValidationCount++ }
-
-    }
-    else{
-    
-    [System.Windows.MessageBox]::Show("Error in Target Folder TextBox: The path provided does not exist")
+        }
 
     }
 
-    if(Test-Path $AutounattendPathTextBox.Text){
-
-        if($AutounattendPathTextBox.Text -notmatch [regex]'[a-zA-Z][:][\\][a-zA-Z0-9\-_.$\\]{1,}' -or $AutounattendPathTextBox.Text -notmatch [regex]'\\\\([a-zA-Z0-9\.]{1,3}){4}[a-zA-Z0-9\-_$.\\]{1,}' -and $AutounattendPathTextBox.Text -notmatch "Autounattend.xml") {
+    else {
     
-        [System.Windows.MessageBox]::Show("Error in Autounattend.xml TextBox: Make sure to include Autounattend.xml as well as the full path to it")
-        $CreateISOButton.Enabled = $False
-
-        }else{ $ISOValidationCount++ } 
-
-    }
-    else{
+    [System.Windows.MessageBox]::Show("Error in ISO Path TextBox: No path provided")
     
-    [System.Windows.MessageBox]::Show("Error in Autounattend.xml TextBox: The path provided does not exist")
-
     }
 
-    if(Test-Path $BootFilePathTextBox.Text){
 
-        if($BootFilePathTextBox.Text -notmatch [regex]'[a-zA-Z][:][\\][a-zA-Z0-9\-_.$\\]{1,}' -or $BootFilePathTextBox.Text -notmatch [regex]'\\\\([a-zA-Z0-9\.]{1,3}){4}[a-zA-Z0-9\-_$.\\]{1,}' -and $BootFilePathTextBox.Text -notmatch "etfsboot.com") {
+    if($TargetFolderTextBox.Text.Length -ge 1) {
+
+        if(Test-Path $TargetFolderTextBox.Text -ErrorAction SilentlyContinue) {
+
+            if($TargetFolderTextBox.Text -notmatch [regex]'[a-zA-Z][:][\\][a-zA-Z0-9\-_$\\]{1,}' -or $TargetFolderTextBox.Text -notmatch [regex]'\\\\([a-zA-Z0-9\.]{1,3}){4}[a-zA-Z0-9\-_$\\]{1,}' -and $TargetFolderTextBox.Text -notmatch ".") {
     
-        [System.Windows.MessageBox]::Show("Error in Boot File TextBox: Make sure to include etfsboot.com as well as the full path to it")
-        $CreateISOButton.Enabled = $False
+            [System.Windows.MessageBox]::Show("Error in Target Folder TextBox: Only include the path to a folder")
+            $CreateISOButton.Enabled = $False
+
+            }else{ $ISOValidationCount++ }
+
+        }
+
+        else {
+    
+        [System.Windows.MessageBox]::Show("Error in Target Folder TextBox: The path provided does not exist")
+
+        }
+
+    }
+
+    else {
+    
+    [System.Windows.MessageBox]::Show("Error in Target Folder TextBox: No path provided")
+
+    }
+
+
+    if($AutounattendPathTextBox.Text.Length -ge 1) {
+
+        if(Test-Path $AutounattendPathTextBox.Text -ErrorAction SilentlyContinue) {
+
+            if($AutounattendPathTextBox.Text -notmatch [regex]'[a-zA-Z][:][\\][a-zA-Z0-9\-_.$\\]{1,}' -or $AutounattendPathTextBox.Text -notmatch [regex]'\\\\([a-zA-Z0-9\.]{1,3}){4}[a-zA-Z0-9\-_$.\\]{1,}' -and $AutounattendPathTextBox.Text -notmatch "Autounattend.xml") {
+    
+            [System.Windows.MessageBox]::Show("Error in Autounattend.xml TextBox: Make sure to include Autounattend.xml as well as the full path to it")
+            $CreateISOButton.Enabled = $False
+
+            }else{ $ISOValidationCount++ } 
+
+        }
+
+        else {
+    
+        [System.Windows.MessageBox]::Show("Error in Autounattend.xml TextBox: The path provided does not exist")
+
+        }
+
+    }
+
+    else {
+    
+    [System.Windows.MessageBox]::Show("Error in Autounattend.xml TextBox: No path provided")
+    
+    }
+
+
+    if($BootFilePathTextBox.Text.Length -ge 1) {
+
+        if(Test-Path $BootFilePathTextBox.Text -ErrorAction SilentlyContinue) {
+
+            if($BootFilePathTextBox.Text -notmatch [regex]'[a-zA-Z][:][\\][a-zA-Z0-9\-_.$\\]{1,}' -or $BootFilePathTextBox.Text -notmatch [regex]'\\\\([a-zA-Z0-9\.]{1,3}){4}[a-zA-Z0-9\-_$.\\]{1,}' -and $BootFilePathTextBox.Text -notmatch "etfsboot.com") {
+    
+            [System.Windows.MessageBox]::Show("Error in Boot File TextBox: Make sure to include etfsboot.com as well as the full path to it")
+            $CreateISOButton.Enabled = $False
         
-        }else{ $ISOValidationCount++ }
+            }else{ $ISOValidationCount++ }
     
-    }
-    else{
+        }
+
+        else {
     
-    [System.Windows.MessageBox]::Show("Error in Boot File TextBox: The path provided does not exist")
+        [System.Windows.MessageBox]::Show("Error in Boot File TextBox: The path provided does not exist")
+
+        }
 
     }
 
-    if(Test-Path $ISOToolPathTextBox.Text){
-
-        if($ISOToolPathTextBox.Text -notmatch [regex]'[a-zA-Z][:][\\][a-zA-Z0-9\-_.$\\]{1,}' -or $ISOToolPathTextBox.Text -notmatch [regex]'\\\\([a-zA-Z0-9\.]{1,3}){4}[a-zA-Z0-9\-_$.\\]{1,}' -and $ISOToolPathTextBox.Text -notmatch "oscdimg.exe") {
+    else {
     
-        [System.Windows.MessageBox]::Show("Error in ISO Creation Tool TextBox: Make sure to include oscdimg.exe as well as the full path to it")
-        $CreateISOButton.Enabled = $False
-
-        }else{ $ISOValidationCount++ }
+    [System.Windows.MessageBox]::Show("Error in Boot File TextBox: No path provided")
     
     }
-    else{
+
+
+    if($ISOToolPathTextBox.Text.Length -ge 1) {
+
+        if(Test-Path $ISOToolPathTextBox.Text -ErrorAction SilentlyContinue) {
+
+            if($ISOToolPathTextBox.Text -notmatch [regex]'[a-zA-Z][:][\\][a-zA-Z0-9\-_.$\\]{1,}' -or $ISOToolPathTextBox.Text -notmatch [regex]'\\\\([a-zA-Z0-9\.]{1,3}){4}[a-zA-Z0-9\-_$.\\]{1,}' -and $ISOToolPathTextBox.Text -notmatch "oscdimg.exe") {
     
-    [System.Windows.MessageBox]::Show("Error in ISO Creation Tool TextBox: The path provided does not exist")
+            [System.Windows.MessageBox]::Show("Error in ISO Creation Tool TextBox: Make sure to include oscdimg.exe as well as the full path to it")
+            $CreateISOButton.Enabled = $False
+
+            }else{ $ISOValidationCount++ }
+    
+        }
+
+        else {
+    
+        [System.Windows.MessageBox]::Show("Error in ISO Creation Tool TextBox: The path provided does not exist")
+
+        }
 
     }
+
+    else {
+    
+    [System.Windows.MessageBox]::Show("Error in ISO Creation Tool TextBox: No path provided")
+    
+    }
+
 
     If($InstallXenToolsCheckbox.CheckState -eq 'Checked') {
 
-        if(Test-Path $XenToolsPathTextBox.Text){
+        if($XenToolsPathTextBox.Text.Length -ge 1) {
 
-            if($XenToolsPathTextBox.Text -notmatch [regex]'[a-zA-Z][:][\\][a-zA-Z0-9\-_$\\]{1,}' -or $XenToolsPathTextBox.Text -notmatch [regex]'\\\\([a-zA-Z0-9\.]{1,3}){4}[a-zA-Z0-9\-_$\\]{1,}') {
+            if(Test-Path $XenToolsPathTextBox.Text) {
+
+                if($XenToolsPathTextBox.Text -notmatch [regex]'[a-zA-Z][:][\\][a-zA-Z0-9\-_$\\]{1,}' -or $XenToolsPathTextBox.Text -notmatch [regex]'\\\\([a-zA-Z0-9\.]{1,3}){4}[a-zA-Z0-9\-_$\\]{1,}') {
     
-            $ISOValidationCount++ 
+                $ISOValidationCount++ 
+
+                }
+        
+                else{ 
+        
+                [System.Windows.MessageBox]::Show("Error in Xen Tools TextBox: The Check box for installing XenServer Tools is enabled but no path was selected")
+                $CreateISOButton.Enabled = $False 
+        
+                }
 
             }
-        
-            else{ 
-        
-            [System.Windows.MessageBox]::Show("Error in Xen Tools TextBox: The Check box for installing XenServer Tools is enabled but no path was selected")
-            $CreateISOButton.Enabled = $False 
-        
+
+            else {
+    
+            [System.Windows.MessageBox]::Show("Error in Xen Tools TextBox: The path provided does not exist")
+
             }
 
         }
-        else{
-    
-        [System.Windows.MessageBox]::Show("Error in Xen Tools TextBox: The path provided does not exist")
+
+        else {
+        
+        [System.Windows.MessageBox]::Show("Error in Xen Tools TextBox: No path provided")
 
         }
         
     }
+
 
     if($AdminNameTextBox.Text.Length -lt 1) {
     
@@ -1032,9 +1134,10 @@ $ISOValidationCount = 0
 
     }else{ $ISOValidationCount++ }
 
-    if($Windows10Checkbox.CheckState -ne 'Unchecked' -or $Server2016CheckBox.CheckState -ne 'Unchecked'){
+
+    if($Windows10Checkbox.CheckState -ne 'Unchecked' -or $Server2016CheckBox.CheckState -ne 'Unchecked') {
     
-        if($DropDownEditionSelection.SelectedItem -eq $null){
+        if($DropDownEditionSelection.SelectedItem -eq $null) {
 
         [System.Windows.MessageBox]::Show("Error in Edition Selection DropDown: No edition selected")
         $CreateISOButton.Enabled = $False
@@ -1042,13 +1145,15 @@ $ISOValidationCount = 0
         }else{ $ISOValidationCount++ }
 
     }
-    else{
+    
+    else {
     
     [System.Windows.MessageBox]::Show("Error in Edition Selection Checkboxes: No OS selected")
     
     }
 
-    if($DropDownTimeZones.SelectedItem -eq $null){
+
+    if($DropDownTimeZones.SelectedItem -eq $null) {
 
     [System.Windows.MessageBox]::Show("Error in TimeZone Selection DropDown: No TimeZone selected")
     $CreateISOButton.Enabled = $False
@@ -1161,8 +1266,7 @@ Function ChangeIPAddresses {
 
         } -ArgumentList $NewIPAddress, $PrefixLength, $DefaultGateway, $DNSServers -AsJob
     
-    [System.Windows.Forms.Application]::DoEvents()
-    Start-Sleep -s 2
+    WaitScript 2
 
     }
 
@@ -1186,15 +1290,15 @@ Function ChangeComputerNames {
 
     $VMStatusTextBox.AppendText("`r`nChanging $($Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DCServer)]) Machine Name to $DCServer")
 
-        Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DCServer)] -credential $ConnectionCreds -ScriptBlock {
+        $RenameDC = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DCServer)] -credential $ConnectionCreds -ScriptBlock {
 
         param ($DCServer)
 
         Rename-Computer -NewName $DCServer -Restart
 
-        } -ArgumentList $DCServer
+        } -ArgumentList $DCServer -AsJob
 
-    [System.Windows.Forms.Application]::DoEvents()
+        WaitJob $RenameDC
 
     }
 
@@ -1205,15 +1309,15 @@ Function ChangeComputerNames {
 
     $VMStatusTextBox.AppendText("`r`nChanging $($Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DomainServer)]) Machine Name to $DomainServer")
 
-        Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DomainServer)] -credential $ConnectionCreds -ScriptBlock {
+        $RenameMember = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DomainServer)] -credential $ConnectionCreds -ScriptBlock {
 
         param ($DomainServer)
 
         Rename-Computer -NewName $DomainServer -Restart
 
-        } -ArgumentList $DomainServer
+        } -ArgumentList $DomainServer -AsJob
 
-    [System.Windows.Forms.Application]::DoEvents()
+        WaitJob $RenameMember
 
     }
 
@@ -1237,13 +1341,13 @@ Function InstallDCComponents {
 
     $VMStatusTextBox.AppendText("`r`nInstalling Domain Controller Components on $DCServer")
 
-        Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DCServer)] -credential $ConnectionCreds -ScriptBlock {
+        $DCComponents = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DCServer)] -credential $ConnectionCreds -ScriptBlock {
 
         Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
 
-        }
+        } -AsJob
 
-    [System.Windows.Forms.Application]::DoEvents()
+        WaitJob $DCComponents
 
     }
 
@@ -1262,38 +1366,37 @@ Function PromotePrimaryDomainController {
     $ConnectionPassword = ConvertTo-SecureString -AsPlainText -Force -String $LocalPasswordTextBox.Text
     $ConnectionCreds = New-Object -typename System.Management.Automation.PSCredential -argumentlist "$($Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DCServer.Replace("*",''))])\$($LocalUsernameTextBox.Text)",$ConnectionPassword
 
-    if($DFSCheckbox.CheckState -eq "Checked") {
+        if($DFSCheckbox.CheckState -eq "Checked") {
     
-        $VMStatusTextBox.AppendText("`r`nInstalling DFSR Components on $($DCServer.Replace("*"," ")) for DFS Buildout")
+            $VMStatusTextBox.AppendText("`r`nInstalling DFSR Components on $($DCServer.Replace("*"," ")) for DFS Buildout")
 
-        Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DCServer.Replace("*",""))] -credential $ConnectionCreds -ScriptBlock {
+            $DFSComponents = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DCServer.Replace("*",""))] -credential $ConnectionCreds -ScriptBlock {
 
-        #Install DFSR components if DFS was selected during component selection, this is necessary for DFS buildout functionality
-        Install-WindowsFeature FS-DFS-Replication -IncludeManagementTools
+            #Install DFSR components if DFS was selected during component selection, this is necessary for DFS buildout functionality
+            Install-WindowsFeature FS-DFS-Replication -IncludeManagementTools
 
+            } -AsJob
+
+            WaitJob $DFSComponents
+    
         }
-    
-    }
 
     $VMStatusTextBox.AppendText("`r`nPromoting $($DCServer.Replace("*"," ")) to a Domain Controller")
 
-        Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DCServer.Replace("*",""))] -credential $ConnectionCreds -ScriptBlock {
+        $DCPromotion = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DCServer.Replace("*",""))] -credential $ConnectionCreds -ScriptBlock {
 
         param ($DomainName,$SafeModePassword)
 
         #Create the AD DS Forest with the paramaeters specified in the AD DS buildout form
         Install-ADDSForest -DomainName $DomainName -SafeModeAdministratorPassword $SafeModePassword -DomainNetBIOSName $DomainName.Remove($DomainName.IndexOf(".")).ToUpper() -SYSVOLPath "C:\Windows\SYSVOL" -LogPath "C:\Windows\NTDS" -DatabasePath "C:\Windows\NTDS" -InstallDNS -Force
 
-        } -ArgumentList $DomainName,$SafeModePassword
+        } -ArgumentList $DomainName,$SafeModePassword -AsJob
 
-    [System.Windows.Forms.Application]::DoEvents()
-    Start-Sleep -s 15
-    [System.Windows.Forms.Application]::DoEvents()
-        
-        #If the Domain Controller does not reboot automatically within 15 seconds, reboot the machine to speed up the process 
-        if(Test-Connection -ComputerName ($Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DCServer.Replace("*",""))]) -Count 1 -ErrorAction SilentlyContinue) {
+        WaitJob $DCPromotion
 
-        Invoke-XenVM -Name $DCServer.Replace("*","") -XenAction CleanReboot
+        if(Test-Connection -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DCServer.Replace("*",""))] -Count 1 -ErrorAction SilentlyContinue) {
+
+        Invoke-XenVM -Name $DCServer -XenAction CleanReboot
 
         }
 
@@ -1305,6 +1408,8 @@ $VMStatusTextBox.AppendText("`r`n")
 
 
 Function PromoteSecondaryDomainControllers {
+
+$VMStatusTextBox.AppendText("`r`n")
 
     foreach($DCServer in ($DomainControllersListBox.Items | where {$_ -notmatch [regex]'\*'})) {
 
@@ -1322,9 +1427,9 @@ Function PromoteSecondaryDomainControllers {
 
         Install-ADDSDomainController -DomainName $DomainName -Credential $DomainAdminCreds -SafeModeAdministratorPassword $SafeModePassword -SYSVOLPath "C:\Windows\SYSVOL" -LogPath "C:\Windows\NTDS" -DatabasePath "C:\Windows\NTDS" -InstallDns -Force 
 
-        } -ArgumentList $DomainName,$SafeModePassword,$DomainAdminCreds 
+        } -ArgumentList $DomainName,$SafeModePassword,$DomainAdminCreds -AsJob
 
-    [System.Windows.Forms.Application]::DoEvents()
+        WaitJob $SecondaryJob
 
     }
 
@@ -1335,7 +1440,7 @@ $VMStatusTextBox.AppendText("`r`n")
 
 Function JoinToDomain {
 
-    Start-Sleep -s 30
+    WaitScript 30
 
     foreach($DomainMachine in $AllServersListBox.Items) {
 
@@ -1346,16 +1451,17 @@ Function JoinToDomain {
 
     $VMStatusTextBox.AppendText("`r`nJoining $DomainMachine to the $DomainName Domain")
 
-        Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DomainMachine)] -credential $ConnectionCreds -ScriptBlock {
+        $JoinToDomain = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DomainMachine)] -credential $ConnectionCreds -ScriptBlock {
 
         param ($DomainName,$DomainAdminCreds)
 
         Add-Computer -DomainName $DomainName -Credential $DomainAdminCreds -Restart -Force
 
-        } -ArgumentList $DomainName,$DomainAdminCreds
+        } -ArgumentList $DomainName,$DomainAdminCreds -AsJob
 
-    [System.Windows.Forms.Application]::DoEvents()
-    Start-Sleep -s 3
+        WaitJob $JoinToDomain
+
+    WaitScript 3
 
     }
 
@@ -1370,8 +1476,6 @@ Function PopulateUsernameAndPassword {
     
     $LocalUsernameTextBox.Text = $AdminNameTextBox.Text
     $LocalPasswordTextBox.Text = $AdminPasswordTextBox.Text
-    $LocalUsernameTextBox.Enabled = $False
-    $LocalPasswordTextBox.Enabled = $False
 
     }
 
@@ -1527,7 +1631,7 @@ $XenServerPassword = $PasswordTextBox.Text
 
                 }
 
-            Start-Sleep -s 2
+            WaitScript 2
 
             }
 
@@ -1552,13 +1656,12 @@ $ListViewCount = $CheckStateListView.Items.Count
 
     }
 
-$ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningCount/$ListViewCount Complete `n`nNote: This Can Take up to 1.5 Hours to Complete"
+$ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningCount/$ListViewCount Complete `n`nNote: This Can Take up to 1.5 Hours to Complete`nElapsed Time: $($Global:StopWatch.Elapsed.Hours):$($Global:StopWatch.Elapsed.Minutes):$($Global:StopWatch.Elapsed.Seconds)"
 
+    
     While($RunningCount -lt $ListViewCount) {
 
         foreach($RunningJob in $Global:GetVMIPs){
-        
-        [System.Windows.Forms.Application]::DoEvents()
 
             if((Get-Job $RunningJob.Name -ErrorAction SilentlyContinue).State -eq "Completed" -and ((Get-XenVM -Name $RunningJob.Name | Select -ExpandProperty guest_metrics | Get-XenVMGuestMetrics).networks.'0/ipv4/0') -and ((Get-XenVM -Name $RunningJob.Name | Select -ExpandProperty guest_metrics | Get-XenVMGuestMetrics).networks.'0/ipv4/0') -notmatch "169.254") {
             
@@ -1581,7 +1684,7 @@ $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningC
 
                 }
 
-            $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningCount/$ListViewCount Complete `n`nNote: This Can Take up to 1.5 Hours to Complete"
+            $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningCount/$ListViewCount Complete `n`nNote: This Can Take up to 1.5 Hours to Complete`nElapsed Time: $($Global:StopWatch.Elapsed.Hours):$($Global:StopWatch.Elapsed.Minutes):$($Global:StopWatch.Elapsed.Seconds)"
 
             }
 
@@ -1604,8 +1707,8 @@ $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningC
 
                 }
 
-            $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningCount/$ListViewCount Complete `n`nNote: This Can Take up to 1.5 Hours to Complete"
-            
+            $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningCount/$ListViewCount Complete `n`nNote: This Can Take up to 1.5 Hours to Complete`nElapsed Time: $($Global:StopWatch.Elapsed.Hours):$($Global:StopWatch.Elapsed.Minutes):$($Global:StopWatch.Elapsed.Seconds)"
+
             }
             
             if((((Get-date) - $Global:StartTime).hours -eq 1) -and (((Get-date) - $Global:StartTime).Minutes -eq 12) -and (!((Get-XenVM -Name $RunningJob.Name | Select -ExpandProperty guest_metrics | Get-XenVMGuestMetrics).networks.'0/ipv4/0')) -and ($NeededReboot[($Global:AllCreatedServers | sort).IndexOf($RunningJob.Name)] -eq $False)) {
@@ -1650,19 +1753,23 @@ $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningC
             }
             
         }
-
-        Start-Sleep -Milliseconds 500
+    
+    Start-Sleep -Milliseconds 200
+    [System.Windows.Forms.Application]::DoEvents()
+    $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningCount/$ListViewCount Complete `n`nNote: This Can Take up to 1.5 Hours to Complete`nElapsed Time: $($Global:StopWatch.Elapsed.Hours):$($Global:StopWatch.Elapsed.Minutes):$($Global:StopWatch.Elapsed.Seconds)"
+    $ServerStatusLabel.Refresh()
 
     }
 
-start-sleep -s 5
+$Global:StopWatch.Stop()
+WaitScript 5
 
 }
 
 
 Function DomainCreation {
 
-$ServerStatusLabel.Text = "Starting Domain Creation `n`nNote: This Will Take About 15-25 Minutes to Complete"
+$ServerStatusLabel.Text = "Starting Domain Creation `n`nNote: This Will Take About 15-25 Minutes to Complete`n"
 
 $ProccessFullReboot = 0
 
@@ -1670,25 +1777,29 @@ $VMStatusTextBox.AppendText("`r`n=========================")
 $VMStatusTextBox.AppendText("`r`nStarting Domain Creation")
 $VMStatusTextBox.AppendText("`r`n=========================`r`n")
 
-Start-Sleep -s 10
+WaitScript 10
 
 AssociateVMsWithOldIPs
 
-[System.Windows.Forms.Application]::DoEvents()
-Start-Sleep -s 10
-[System.Windows.Forms.Application]::DoEvents()
+WaitScript 10
 
 ChangeIPAddresses
 
-[System.Windows.Forms.Application]::DoEvents()
-Start-Sleep -s 120
-[System.Windows.Forms.Application]::DoEvents()
+$VMStatusTextBox.AppendText("`r`nWating for All IP Addresses to Change")
+
+    foreach($ComputerIP in $Global:IPAddresses) {
+    
+    CheckServerOnState $ComputerIP
+    
+    }
+
+$VMStatusTextBox.AppendText("`r`nAll IP Addresses Have Been Successfully Changed`r`n")
 
 ChangeComputerNames
 
-[System.Windows.Forms.Application]::DoEvents()
-Start-Sleep -s 15
-[System.Windows.Forms.Application]::DoEvents()
+WaitScript 10
+
+$VMStatusTextBox.AppendText("`r`nWating for All VMs to Reboot")
 
     foreach($DCCreated in $DomainControllersListBox.Items) {
    
@@ -1702,21 +1813,17 @@ Start-Sleep -s 15
 
     }
 
-[System.Windows.Forms.Application]::DoEvents()
-Start-Sleep -s 20
-[System.Windows.Forms.Application]::DoEvents()
+$VMStatusTextBox.AppendText("`r`nAll VMs Have Finished Rebooting`r`n")
+
+WaitScript 20
 
 InstallDCComponents
-
-[System.Windows.Forms.Application]::DoEvents()
-Start-Sleep -s 15
-[System.Windows.Forms.Application]::DoEvents()
+ 
+WaitScript 10
 
 PromotePrimaryDomainController
 
-[System.Windows.Forms.Application]::DoEvents()
-Start-Sleep -s 15
-[System.Windows.Forms.Application]::DoEvents()
+WaitScript 10
 
     foreach($PrimaryDCCreated in $DomainControllersListBox.Items  | where {$_ -match [regex]'\*'}) {
 
@@ -1724,30 +1831,23 @@ Start-Sleep -s 15
 
     }
 
-    $VMStatusTextBox.AppendText("`r`nWating for $(($DomainControllersListBox.Items  | where {$_ -match [regex]'\*'}).Replace("*",'')) to Completely Reboot")
+$VMStatusTextBox.AppendText("`r`nWating for $(($DomainControllersListBox.Items  | where {$_ -match [regex]'\*'}).Replace("*",'')) to Completely Reboot`r`n")
 
     while($ProccessFullReboot -ne 6){
     
     $VMStatusTextBox.AppendText("`r`nTime Until Resumption: $(6 - $ProccessFullReboot) Minutes")
 
-    [System.Windows.Forms.Application]::DoEvents()
-    Start-Sleep -Seconds 60
+    WaitScript 59
 
     $ProccessFullReboot++
 
     }
 
-    $VMStatusTextBox.AppendText("`r`n")
-
-[System.Windows.Forms.Application]::DoEvents()
-Start-Sleep -s 10
-[System.Windows.Forms.Application]::DoEvents()
+WaitScript 10
 
 PromoteSecondaryDomainControllers
 
-[System.Windows.Forms.Application]::DoEvents()
-Start-Sleep -s 15
-[System.Windows.Forms.Application]::DoEvents()
+WaitScript 10
 
     foreach($SecondaryDCCreated in $DomainControllersListBox.Items | where {$_ -notmatch [regex]'\*'}) {
 
@@ -1755,15 +1855,11 @@ Start-Sleep -s 15
 
     }
 
-[System.Windows.Forms.Application]::DoEvents()
-Start-Sleep -s 10
-[System.Windows.Forms.Application]::DoEvents()
+WaitScript 10
 
 JoinToDomain
 
-[System.Windows.Forms.Application]::DoEvents()
-Start-Sleep -s 10
-[System.Windows.Forms.Application]::DoEvents()
+WaitScript 10
 
 $VMStatusTextBox.AppendText("`r`nWaiting for all VMs to Reboot`r`n")
 
@@ -1773,9 +1869,7 @@ $VMStatusTextBox.AppendText("`r`nWaiting for all VMs to Reboot`r`n")
 
     }
 
-[System.Windows.Forms.Application]::DoEvents()
-Start-Sleep -s 20
-[System.Windows.Forms.Application]::DoEvents()
+WaitScript 10
 
 $VMStatusTextBox.AppendText("`r`n=========================")
 $VMStatusTextBox.AppendText("`r`nDomain Creation Complete")
@@ -1818,6 +1912,7 @@ $DomainCounter = 0
     $DomainBuildoutButton.Enabled = $False
 
     }
+
     elseif($DomainNameTextBox.Text -notmatch [regex]"^(?!:\/\/)([a-zA-Z0-9-_]+\.)*[a-zA-Z0-9][a-zA-Z0-9-_]+\.[a-zA-Z]{2,11}?$") {
     
     [System.Windows.MessageBox]::Show("Error in Domain Name TextBox: Syntax error")
@@ -1832,6 +1927,7 @@ $DomainCounter = 0
     $DomainBuildoutButton.Enabled = $False
 
     }
+
     elseif($SafeModePasswordTextBox.Text -notmatch [regex]"(?=(.*[0-9]))(?=.*[\!@#$%^&*()\\[\]{}\-_+=~`|:;'<>,.?])(?=.*[a-z])(?=(.*[A-Z]))(?=(.*)).{8,}") { 
     
     [System.Windows.MessageBox]::Show("Error in Safe Mode Password TextBox: Syntax error`n`nSafe Mode password must meet the following:`n`t- At least 8 characters`n`t- At least one lowercase letter`n`t- At least one uppercase letter`n`t- At least one number`n`t- At least one non-alpha numeric character")
@@ -1905,6 +2001,7 @@ $DomainCounter = 0
     $DomainBuildoutButton.Enabled = $False 
     
     }
+
     elseif($DomainControllersListBox.Items.Count -ge 2 -and !$PrimaryDC) {
     
     [System.Windows.MessageBox]::Show("Error in Domain Controller Selection: No primary Domain Controller selected")
@@ -1992,8 +2089,8 @@ $AllOUs = @()
     $AllOUs += $OUName.SubString($OUName.IndexOf("-")+1)
     
     }
-
-    if(((($Global:OULocation | where {$_ -match $ParentOU} | select -Skip 1) | % {$_.Remove($_.IndexOf(",")).SubString($_.IndexOf("=")+1)}) -notcontains $OUNameTextBox.Text) -and $OUNameTextBox.Text -notmatch $DomainNameTextBox.Text) {
+    
+    if(((($Global:OULocation | where {$_ -match $ParentOU} | select -Skip 1) | % {$_.Remove($_.IndexOf(",")).SubString($_.IndexOf("=")+1)}) -notcontains $OUNameTextBox.Text) -and (($Global:OULocation | where {$_ -ne $Null -and $_.Split(",",2)[1] -match $Global:BaseDN} | % {if($ParentOU -eq $DomainNameTextBox.Text){$_.Remove($_.IndexOf(",")).SubString($_.IndexOf("=")+1)}}) -notcontains $OUNameTextBox.Text) -and $OUNameTextBox.Text -notmatch $DomainNameTextBox.Text) {
             
         if($DropDownParentOU.Text -notmatch $DomainNameTextBox.Text) {
 
@@ -2192,14 +2289,13 @@ Function CreateGroups {
 
 $PrimaryDC = ($DomainControllersListBox.Items | where {$_ -match [regex]'\*'})
 $DomainName = $DomainNameTextBox.Text
-$GroupCounter = 0
     
-    foreach($CreatedGroups in $GroupsListBox.Items) {
+    foreach($CreatedGroup in $GroupsListBox.Items) {
 
     $ConnectionPassword = convertto-securestring -AsPlainText -Force -String $LocalPasswordTextBox.Text
     $DomainAdminCreds = new-object -typename System.Management.Automation.PSCredential -argumentlist "$($DomainName.Remove($DomainName.IndexOf(".")).ToUpper())\Administrator",$ConnectionPassword
 
-    $VMStatusTextBox.AppendText("`r`nCreating Group - $CreatedGroups")
+    $VMStatusTextBox.AppendText("`r`nCreating Group - $CreatedGroup")
 
         Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($PrimaryDC.Replace("*",""))] -credential $DomainAdminCreds -ScriptBlock {
 
@@ -2207,11 +2303,10 @@ $GroupCounter = 0
 
         New-ADGroup -Name $GroupName -GroupScope $GroupScope -GroupCategory $GroupType -path $GroupOULocation
 
-        } -ArgumentList $Global:GroupName[$GroupCounter],(($Global:OULocation | where {$_ -match $Global:GroupOULocation[$GroupCounter]}) | Select -First 1),$Global:GroupScope[$GroupCounter],$Global:GroupType[$GroupCounter]
+        } -ArgumentList $Global:GroupName[$GroupsListBox.Items.IndexOf($CreatedGroup)],(($Global:OULocation | where {$_ -match $Global:GroupOULocation[$GroupsListBox.Items.IndexOf($CreatedGroup)]}) | Select -First 1),$Global:GroupScope[$GroupsListBox.Items.IndexOf($CreatedGroup)],$Global:GroupType[$GroupsListBox.Items.IndexOf($CreatedGroup)]
 
     Start-Sleep -Milliseconds 500
     [System.Windows.Forms.Application]::DoEvents()
-    $GroupCounter++
     
     }
     
@@ -2224,14 +2319,13 @@ Function CreateUsers {
 
 $PrimaryDC = ($DomainControllersListBox.Items | where {$_ -match [regex]'\*'})
 $DomainName = $DomainNameTextBox.Text
-$UserCounter = 0
     
-    foreach($CreatedUsers in $UsersListBox.Items) {
+    foreach($CreatedUser in $UsersListBox.Items) {
 
     $ConnectionPassword = ConvertTo-SecureString -AsPlainText -Force -String $LocalPasswordTextBox.Text
     $DomainAdminCreds = New-Object -typename System.Management.Automation.PSCredential -argumentlist "$($DomainName.Remove($DomainName.IndexOf(".")).ToUpper())\Administrator",$ConnectionPassword
 
-    $VMStatusTextBox.AppendText("`r`nCreating User - $CreatedUsers")
+    $VMStatusTextBox.AppendText("`r`nCreating User - $CreatedUser")
 
         Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($PrimaryDC.Replace("*",""))] -credential $DomainAdminCreds -ScriptBlock {
 
@@ -2239,11 +2333,10 @@ $UserCounter = 0
 
         New-ADUser -Name "$FirstName $LastName" -GivenName $FirstName -Surname $LastName -DisplayName "$FirstName $LastName" -UserPrincipalName "$LoginName@$DomainName" -Enabled $True -AccountPassword (ConvertTo-SecureString -AsPlainText -Force -String $UserPassword) -Path $UserOULocation
 
-        } -ArgumentList $Global:UserLoginName[$UserCounter],$Global:UserFirstName[$UserCounter],$Global:UserLastName[$UserCounter],$Global:UserPassword[$UserCounter],(($Global:OULocation | where {$_ -match $Global:UserOULocation[$UserCounter]}) | Select -First 1),$DomainName
+        } -ArgumentList $Global:UserLoginName[$UsersListBox.Items.IndexOf($CreatedUser)],$Global:UserFirstName[$UsersListBox.Items.IndexOf($CreatedUser)],$Global:UserLastName[$UsersListBox.Items.IndexOf($CreatedUser)],$Global:UserPassword[$UsersListBox.Items.IndexOf($CreatedUser)],(($Global:OULocation | where {$_ -match $Global:UserOULocation[$UsersListBox.Items.IndexOf($CreatedUser)]}) | Select -First 1),$DomainName
 
     Start-Sleep -Milliseconds 500
     [System.Windows.Forms.Application]::DoEvents()
-    $UserCounter++
 
     }
 
@@ -2262,13 +2355,11 @@ $VMStatusTextBox.AppendText("`r`n=========================`r`n")
 
 CreateOUs
 
-[System.Windows.Forms.Application]::DoEvents()
-Start-Sleep -s 1
+WaitScript 2
 
 CreateGroups
 
-[System.Windows.Forms.Application]::DoEvents()
-Start-Sleep -s 1
+WaitScript 2
 
 CreateUsers
 
@@ -2364,39 +2455,41 @@ $CertificateCounter = 0
 
     $VMStatusTextBox.AppendText("`r`nInstalling Certificate Services Components on $CAServer")
 
-        Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($CAServer)] -credential $DomainAdminCreds -ScriptBlock {
+        $CertificatePromotion = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($CAServer)] -credential $DomainAdminCreds -ScriptBlock {
 
         Install-WindowsFeature Adcs-Cert-Authority -IncludeManagementTools
 
-        }
+        } -AsJob
+
+        WaitJob $CertificatePromotion
 
         if($Global:CAWebEnrollment[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)] -eq "Checked") {
 
         $VMStatusTextBox.AppendText("`r`nInstalling AD CS Web Enrollment Components on $CAServer")
     
-            Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($CAServer)] -credential $DomainAdminCreds -ScriptBlock {
+            $WebEnrollment = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($CAServer)] -credential $DomainAdminCreds -ScriptBlock {
 
             Install-WindowsFeature ADCS-Web-Enrollment -IncludeManagementTools
 
-            } 
+            } -AsJob
+
+            WaitJob $WebEnrollment
     
         }
-
-    [System.Windows.Forms.Application]::DoEvents()
 
         if($Global:CAResponder[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)] -eq "Checked") {
 
         $VMStatusTextBox.AppendText("`r`nInstalling AD CS Online Responder Components on $CAServer")
     
-            Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($CAServer)] -credential $DomainAdminCreds -ScriptBlock {
+            $Responder = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($CAServer)] -credential $DomainAdminCreds -ScriptBlock {
 
             Install-WindowsFeature ADCS-Online-Cert -IncludeManagementTools
 
-            } 
+            } -AsJob
+
+            WaitJob $Responder
     
         }
-
-    [System.Windows.Forms.Application]::DoEvents()
 
     }
 
@@ -2454,43 +2547,45 @@ $AllCAServers = @()
         #If the server is not a subordinate CA, define all parameters
         if($Global:CATypes[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)] -notmatch "Subordinate") {
 
-            Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($CAServer)] -credential $DomainAdminCreds -ScriptBlock {
+            $RootCA = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($CAServer)] -credential $DomainAdminCreds -ScriptBlock {
 
             param ($CAType, $CAName, $HashAlgorithm, $KeyLength, $CryptoProvider, $ValidityPeriod, $ValidityPeriodUnits, $DomainAdminCreds, $DomainName)
 
             Install-AdcsCertificationAuthority -CAType $CAType -CACommonName $CAName -HashAlgorithmName $HashAlgorithm -KeyLength $KeyLength  -CryptoProviderName $CryptoProvider -ValidityPeriod $ValidityPeriod -ValidityPeriodUnits $ValidityPeriodUnits -Credential $DomainAdminCreds -Confirm:$False
             
-            } -ArgumentList $Global:CATypes[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $Global:CANames[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $Global:CAHashAlgorithm[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $Global:CAKeyLength[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $Global:CACryptoProvider[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $Global:CAValidityPeriod[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $Global:CAValidityPeriodUnits[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $DomainAdminCreds, $DomainName
+            } -ArgumentList $Global:CATypes[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $Global:CANames[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $Global:CAHashAlgorithm[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $Global:CAKeyLength[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $Global:CACryptoProvider[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $Global:CAValidityPeriod[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $Global:CAValidityPeriodUnits[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $DomainAdminCreds, $DomainName -AsJob
+
+            WaitJob $RootCA
 
         }
 
         #Else, only create a CA using the parent specified and a few other parameters
         else {
 
-            Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($CAServer)] -credential $DomainAdminCreds -ScriptBlock {
+            $SubordinateCA = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($CAServer)] -credential $DomainAdminCreds -ScriptBlock {
 
             param ($CAType, $CAName, $ParentCAName, $ParentCA, $DomainAdminCreds, $DomainName)
 
             Install-AdcsCertificationAuthority -CAType $CAType -ParentCA "$ParentCA.$DomainName\$ParentCAName" -CACommonName $CAName -Credential $DomainAdminCreds -Confirm:$False
 
-            } -ArgumentList $Global:CATypes[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $Global:CANames[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $Global:CANames[$CertificateAuthoritiesListBox.Items.IndexOf($Global:ParentCA[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)])], $Global:ParentCA[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $DomainAdminCreds, $DomainName
+            } -ArgumentList $Global:CATypes[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $Global:CANames[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $Global:CANames[$CertificateAuthoritiesListBox.Items.IndexOf($Global:ParentCA[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)])], $Global:ParentCA[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)], $DomainAdminCreds, $DomainName -AsJob
+
+            WaitJob $SubordinateCA
 
         } 
-
-    [System.Windows.Forms.Application]::DoEvents()
         
         #If the server was chosen as a web enrollment server, install the role
         if($Global:CAWebEnrollment[$CertificateAuthoritiesListBox.Items.IndexOf($CAServer)] -eq "Checked") {
 
         $VMStatusTextBox.AppendText("`r`nPromoting $CAServer to a Web Enrollment Server")
     
-            Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($CAServer)] -credential $DomainAdminCreds -ScriptBlock {
+            $EnrollmentPromotion = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($CAServer)] -credential $DomainAdminCreds -ScriptBlock {
 
             Install-AdcsWebEnrollment -Confirm:$False
 
-            } 
+            } -AsJob
 
-        [System.Windows.Forms.Application]::DoEvents()
+            WaitJob $EnrollmentPromotion
 
         }
 
@@ -2499,17 +2594,17 @@ $AllCAServers = @()
 
         $VMStatusTextBox.AppendText("`r`nPromoting $CAServer to an Online Responder")
     
-            Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($CAServer)] -credential $DomainAdminCreds -ScriptBlock {
+            $ResponderPromotion = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($CAServer)] -credential $DomainAdminCreds -ScriptBlock {
 
             Install-AdcsOnlineResponder -Confirm:$False
 
-            } 
+            } -AsJob
 
-        [System.Windows.Forms.Application]::DoEvents()
+            WaitJob $ResponderPromotion
     
         }
 
-    Start-Sleep -s 15
+    WaitScript 15
 
     }
 
@@ -2528,9 +2623,7 @@ $VMStatusTextBox.AppendText("`r`n=========================`r`n")
 
 InstallCertificateComponents
 
-[System.Windows.Forms.Application]::DoEvents()
-Start-Sleep -s 15
-[System.Windows.Forms.Application]::DoEvents()
+WaitScript 15
 
 InstallAllServices
 
@@ -2643,9 +2736,9 @@ $AddDFSFolderValidation = 0
             
     } else { $AddDFSFolderValidation++ }
 
-    if($DFSFolderTextBox.Text.Length -ge 1){
+    if($DFSTargetTextBox.Text.Length -ge 1){
 
-        if($DFSTargetTextBox.Text -notmatch [regex]'[a-zA-Z][:][\\][a-zA-Z0-9\-_.$\\]{1,}' -or $DFSTargetTextBox.Text -notmatch [regex]'\\\\([a-zA-Z0-9\.]{1,3}){4}[a-zA-Z0-9\-_$.\\]{1,}') {
+        if($DFSTargetTextBox.Text -notmatch [regex]'[a-zA-Z][:][\\][a-zA-Z0-9\-_.$\\]{1,}') {
 
         [System.Windows.MessageBox]::Show("Error in DFS Folder Target TextBox: A folder target was specified, but it either does not meet the length requirements or is not in the correct format")
 
@@ -2653,7 +2746,7 @@ $AddDFSFolderValidation = 0
 
     }
 
-    if($AddDFSFolderValidation -eq 2 -or $AddDFSFolderValidation -eq 3) {
+    if(($AddDFSFolderValidation -eq 2 -and $DFSTargetTextBox.Text.Length -lt 1) -or ($AddDFSFolderValidation -eq 3 -and $DFSTargetTextBox.Text -match [regex]'[a-zA-Z][:][\\][a-zA-Z0-9\-_.$\\]{1,}')) {
 
     $DFSFoldersListBox.Items.Add($DFSFolderTextBox.Text)
      
@@ -2712,15 +2805,15 @@ $DomainAdminCreds = new-object -typename System.Management.Automation.PSCredenti
 
     $VMStatusTextBox.AppendText("`r`nPromoting $DFSServer to a DFS Server")
 
-        Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DFSServer)] -credential $DomainAdminCreds -ScriptBlock {
+        $DFSPromotion = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DFSServer)] -credential $DomainAdminCreds -ScriptBlock {
 
         Install-WindowsFeature FS-FileServer -IncludeManagementTools
         Install-WindowsFeature FS-DFS-Namespace -IncludeManagementTools
         Install-WindowsFeature FS-DFS-Replication -IncludeManagementTools
 
-        }
+        } -AsJob
 
-    [System.Windows.Forms.Application]::DoEvents()
+        WaitJob $DFSPromotion
 
     }
 
@@ -2739,6 +2832,8 @@ $PrimaryDC = ($DomainControllersListBox.Items | where { $_ -match [regex]"\*" })
 
     foreach($DFSNamespace in $DFSRootsListBox.Items) {
 
+        $VMStatusTextBox.AppendText("`r`nCreating DFS NameSpace $DFSNamespace")
+
         foreach($DFSServer in $DFSServersListBox.Items) {
         
             if($DFSServer -match [regex]'\*') {
@@ -2749,7 +2844,7 @@ $PrimaryDC = ($DomainControllersListBox.Items | where { $_ -match [regex]"\*" })
             
             $VMStatusTextBox.AppendText("`r`nCreating DFS Namespace Folder '$DFSNamespace' on $DFSServer")
 
-            Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DFSServer)] -Credential $DomainAdminCreds -ScriptBlock {
+            $FolderCreation = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DFSServer)] -Credential $DomainAdminCreds -ScriptBlock {
 
             param ($DFSNamespace)
             
@@ -2757,13 +2852,13 @@ $PrimaryDC = ($DomainControllersListBox.Items | where { $_ -match [regex]"\*" })
             New-SmbShare -Path "C:\DFSRoots\$DFSNamespace" -Name $DFSNamespace
             Grant-SmbShareAccess -Name "$DFSNamespace" -AccountName "Everyone" -AccessRight Full -Force
 
-            } -ArgumentList $DFSNamespace      
-
-            Start-Sleep 5
-
+            } -ArgumentList $DFSNamespace -AsJob
             
+            WaitJob $FolderCreation    
 
-            Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DFSServer)] -credential $DomainAdminCreds -ScriptBlock {
+            WaitScript 5
+
+            $RootCreation = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DFSServer)] -credential $DomainAdminCreds -ScriptBlock {
 
             param ($DFSServer,$DFSNamespace,$DomainName,$DomainAdminCreds,$PrimaryDC)
 
@@ -2775,14 +2870,11 @@ $PrimaryDC = ($DomainControllersListBox.Items | where { $_ -match [regex]"\*" })
 
                 } -ArgumentList $DFSServer,$DFSNamespace,$DomainName
 
-            } -ArgumentList $DFSServer,$DFSNamespace,$DomainName,$DomainAdminCreds,$PrimaryDC
+            } -ArgumentList $DFSServer,$DFSNamespace,$DomainName,$DomainAdminCreds,$PrimaryDC -AsJob
 
-        [System.Windows.Forms.Application]::DoEvents()
+            WaitJob $RootCreation
 
         }
-
-    $VMStatusTextBox.AppendText("`r`nCreating DFS NameSpace $DFSNamespace")
-    [System.Windows.Forms.Application]::DoEvents()
 
     }
 
@@ -2793,18 +2885,21 @@ $VMStatusTextBox.AppendText("`r`n")
 
 Function CreateDFSFolders {
 
+#Define necessary connection parameters 
 $DomainName = $DomainNameTextBox.Text
 $ConnectionPassword = convertto-securestring -AsPlainText -Force -String $LocalPasswordTextBox.Text
 $DomainAdminCreds = new-object -typename System.Management.Automation.PSCredential -argumentlist "$($DomainName.Remove($DomainName.IndexOf(".")).ToUpper())\Administrator",$ConnectionPassword
 
+#Define the primary domain controller to execute all the commands on
 $PrimaryDC = ($DomainControllersListBox.Items | where { $_ -match [regex]"\*" }).ToString().Replace("*","")
 
     foreach($DFSFolder in $DFSFoldersListBox.Items){
-
+        
+        #If there was a DFS folder target specified, continue with creating that folder and the folder in C:\DFSRoots\<Namespace>
         if($Global:DFSFolderTarget[$Global:DFSFolders.IndexOf($DFSFolder)] -ne $Null) {
 
             foreach($DFSServer in $DFSServersListBox.Items) {
-        
+            
             $DFSPath = "\\$DomainName\$($Global:DFSFolderRoot[$Global:DFSFolders.IndexOf($DFSFolder)])\$DFSFolder"
 
                 if($DFSServer -match [regex]'\*') {
@@ -2813,21 +2908,24 @@ $PrimaryDC = ($DomainControllersListBox.Items | where { $_ -match [regex]"\*" })
             
                 }
 
-                Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DFSServer)] -credential $DomainAdminCreds -ScriptBlock {
+                $DFSFolderCreation = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DFSServer)] -credential $DomainAdminCreds -ScriptBlock {
 
                 param ($DFSFolder,$DFSRoot)
 
+                #Create new DFS folder and share it
                 New-Item -ItemType Directory -Path "C:\DFSRoots\$DFSRoot\" -Name "$DFSFolder" -Force
                 New-SmbShare -Path "C:\DFSRoots\$DFSRoot\$DFSFolder" -Name "$DFSRoot\$DFSFolder"
                 Grant-SmbShareAccess -Name "$DFSRoot\$DFSFolder" -AccountName "Everyone" -AccessRight Full -Force 
 
-                } -ArgumentList $DFSFolder,$Global:DFSFolderRoot[$Global:DFSFolders.IndexOf($DFSFolder)]
+                } -ArgumentList $DFSFolder,$Global:DFSFolderRoot[$Global:DFSFolders.IndexOf($DFSFolder)] -AsJob
 
-                Start-Sleep 5
+                WaitJob $DFSFolderCreation
+
+                WaitScript 5
 
                 $VMStatusTextBox.AppendText("`r`nCreating DFS Folder '$DFSFolder' on $DFSServer")
 
-                Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DFSServer)] -credential $DomainAdminCreds -ScriptBlock {
+                $FolderTarget = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DFSServer)] -credential $DomainAdminCreds -ScriptBlock {
 
                 param ($DFSPath,$DFSServer,$DFSFolder,$DomainAdminCreds,$PrimaryDC,$OriginalServer)
 
@@ -2835,6 +2933,7 @@ $PrimaryDC = ($DomainControllersListBox.Items | where { $_ -match [regex]"\*" })
 
                     param ($DFSPath,$DFSServer,$DFSFolder,$OriginalServer)
 
+                        #If this is the primary DFS server, use the DfsnFolder command, otherwise use DfsnFolderTarget
                         if($OriginalServer -match [regex]"\*") {
 
                         New-DfsnFolder -Path "$DFSPath" -TargetPath "\\$DFSServer\$DFSFolder"
@@ -2849,14 +2948,15 @@ $PrimaryDC = ($DomainControllersListBox.Items | where { $_ -match [regex]"\*" })
 
                     } -ArgumentList $DFSPath,$DFSServer,$DFSFolder,$OriginalServer
 
-                } -ArgumentList $DFSPath,$DFSServer,$DFSFolder,$DomainAdminCreds,$PrimaryDC,($DFSServersListBox.Items | where {$_ -match $DFSServer})
+                } -ArgumentList $DFSPath,$DFSServer,$DFSFolder,$DomainAdminCreds,$PrimaryDC,($DFSServersListBox.Items | where {$_ -match $DFSServer}) -AsJob
+
+                WaitJob $FolderTarget
         
-            [System.Windows.Forms.Application]::DoEvents()
-            
             }
 
         }
 
+        #Else, just make the new folder in C:\DFSRoots\<Namespace>
         else {
 
             foreach($DFSServer in $DFSServersListBox.Items) {
@@ -2869,23 +2969,24 @@ $PrimaryDC = ($DomainControllersListBox.Items | where { $_ -match [regex]"\*" })
 
                 $VMStatusTextBox.AppendText("`r`nCreating DFS Folder '$DFSFolder' on $DFSServer")
 
-                Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DFSServer)] -credential $DomainAdminCreds -ScriptBlock {
+                $StandaloneFolder = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DFSServer)] -credential $DomainAdminCreds -ScriptBlock {
 
                 param ($DFSFolder,$DFSRoot)  
-                          
+                
+                #Create new DFS folder and share it
                 New-Item -ItemType Directory -Path "C:\DFSRoots\$DFSRoot\" -Name $DFSFolder -Force
                 New-SmbShare -Path "C:\DFSRoots\$DFSRoot\$DFSFolder" -Name "$DFSFolder"
                 Grant-SmbShareAccess -Name "$DFSFolder" -AccountName "Everyone" -AccessRight Full -Force
 
-                } -ArgumentList $DFSFolder,$Global:DFSFolderRoot[$Global:DFSFolders.IndexOf($DFSFolder)]
+                } -ArgumentList $DFSFolder,$Global:DFSFolderRoot[$Global:DFSFolders.IndexOf($DFSFolder)] -AsJob
+
+                WaitJob $StandaloneFolder
 
             [System.Windows.Forms.Application]::DoEvents()
             
             }
 
         }
-
-    [System.Windows.Forms.Application]::DoEvents()
 
     }
 
@@ -2910,19 +3011,19 @@ $PrimaryDC = ($DomainControllersListBox.Items | where { $_ -match [regex]"\*" })
         
         $VMStatusTextBox.AppendText("`r`nCreating Replication Group $ReplGroupName")
 
-            Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($PrimaryDC)] -credential $DomainAdminCreds -ScriptBlock {
+            $ReplicationGroup = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($PrimaryDC)] -credential $DomainAdminCreds -ScriptBlock {
 
             param ($ReplGroupName,$DFSFolder)
 
             New-DfsReplicationGroup -GroupName "$ReplGroupName" | New-DfsReplicatedFolder -FolderName "$DFSFolder" -DfsnPath "\\$ReplGroupName"
 
-            } -ArgumentList $ReplGroupName,$DFSFolder
-        
-        [System.Windows.Forms.Application]::DoEvents()
+            } -ArgumentList $ReplGroupName,$DFSFolder -AsJob
 
+            WaitJob $ReplicationGroup
+       
         }
 
-        Start-Sleep 5
+        WaitScript 5
 
         $VMStatusTextBox.AppendText("`r`n Adding Members and Connections to $ReplGroupName")
 
@@ -2936,7 +3037,7 @@ $PrimaryDC = ($DomainControllersListBox.Items | where { $_ -match [regex]"\*" })
             
             }
 
-            Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DFSServer)] -credential $DomainAdminCreds -ScriptBlock {
+            $ReplGroupProperties = Invoke-Command -ComputerName $Global:IPAddresses[($Global:AllCreatedServers | sort).IndexOf($DFSServer)] -credential $DomainAdminCreds -ScriptBlock {
 
             param ($ReplGroupName,$PrimaryDFSServer,$DFSServer,$DFSFolder,$DFSFolderTarget,$DFSFolderRoot,$DomainAdminCreds,$PrimaryDC)
 
@@ -2961,7 +3062,7 @@ $PrimaryDC = ($DomainControllersListBox.Items | where { $_ -match [regex]"\*" })
                     
                 }
 
-                Start-Sleep 5
+                WaitScript 5
 
                 Invoke-Command -ComputerName $PrimaryDC -Credential $DomainAdminCreds -ScriptBlock {
 
@@ -2971,33 +3072,31 @@ $PrimaryDC = ($DomainControllersListBox.Items | where { $_ -match [regex]"\*" })
 
                 Start-Sleep 3
 
-                Get-DfsrMember | % { 
+                    Get-DfsrMember | % { 
             
-                    if($_.ComputerName -match $PrimaryDFSServer) {
+                        if($_.ComputerName -match $PrimaryDFSServer) {
 
-                    Set-DfsrMembership -GroupName "$ReplGroupName" -FolderName "$DFSFolder" -ContentPath "$DFSFolderTarget" -PrimaryMember $True -ComputerName $_.ComputerName -Force
+                        Set-DfsrMembership -GroupName "$ReplGroupName" -FolderName "$DFSFolder" -ContentPath "$DFSFolderTarget" -PrimaryMember $True -ComputerName $_.ComputerName -Force
 
+                        }
+
+                        else {
+            
+                        Set-DfsrMembership -GroupName "$ReplGroupName" -FolderName "$DFSFolder" -ContentPath "$DFSFolderTarget" -ComputerName $_.ComputerName -Force
+
+                        }
+            
                     }
-
-                    else {
-            
-                    Set-DfsrMembership -GroupName "$ReplGroupName" -FolderName "$DFSFolder" -ContentPath "$DFSFolderTarget" -ComputerName $_.ComputerName -Force
-
-                    }
-            
-                }
 
                 Add-DfsrConnection -GroupName "$ReplGroupName" -SourceComputerName "$PrimaryDFSServer" -DestinationComputerName "$DFSServer" -ErrorAction SilentlyContinue
 
                 } -ArgumentList $ReplGroupName,$PrimaryDFSServer,$DFSServer,$DFSFolder,$DFSFolderTarget,$DFSFolderRoot
 
-            } -ArgumentList $ReplGroupName,$PrimaryDFSServer,$DFSServer,$DFSFolder,$Global:DFSFolderTarget[$Global:DFSFolders.IndexOf($DFSFolder)],$Global:DFSFolderRoot[$Global:DFSFolders.IndexOf($DFSFolder)],$DomainAdminCreds,$PrimaryDC
+            } -ArgumentList $ReplGroupName,$PrimaryDFSServer,$DFSServer,$DFSFolder,$Global:DFSFolderTarget[$Global:DFSFolders.IndexOf($DFSFolder)],$Global:DFSFolderRoot[$Global:DFSFolders.IndexOf($DFSFolder)],$DomainAdminCreds,$PrimaryDC -AsJob
 
-        [System.Windows.Forms.Application]::DoEvents()
+            WaitJob $ReplGroupProperties
 
         }
-
-    [System.Windows.Forms.Application]::DoEvents()
     
     }
 
@@ -3008,7 +3107,7 @@ $VMStatusTextBox.AppendText("`r`n")
 
 Function DFSCreation {
 
-$ServerStatusLabel.Text = "Starting Certificate Authority Creation `n`nNote: This Will Take About 1-5 Minutes to Complete"
+$ServerStatusLabel.Text = "Starting Certificate Authority Creation `n`nNote: This Will Take About 2-10 Minutes to Complete"
 
 $VMStatusTextBox.AppendText("`r`n=========================")
 $VMStatusTextBox.AppendText("`r`nStarting DFS Creation")
@@ -3016,21 +3115,15 @@ $VMStatusTextBox.AppendText("`r`n=========================`r`n")
 
 InstallDFSComponents
 
-[System.Windows.Forms.Application]::DoEvents()
-Start-Sleep -s 10
-[System.Windows.Forms.Application]::DoEvents()
+WaitScript 10
 
 CreateNamespaces
 
-[System.Windows.Forms.Application]::DoEvents()
-Start-Sleep -s 10
-[System.Windows.Forms.Application]::DoEvents()
+WaitScript 10
 
 CreateDFSFolders
 
-[System.Windows.Forms.Application]::DoEvents()
-Start-Sleep -s 10
-[System.Windows.Forms.Application]::DoEvents()
+WaitScript 10
 
 CreateReplicationGroups
 
@@ -3812,19 +3905,19 @@ $RemoveFolderForm.StartPosition = 'CenterScreen'
 
                 Catch {
             
-                [System.Windows.MessageBox]::Show("An error occureed: Could not remove the folder - $($TargetFolderTextBox.Text)")
+                [System.Windows.MessageBox]::Show("An error occured: Could not remove the folder - $($TargetFolderTextBox.Text)")
             
                 }
             
-                if(!(Get-ChildItem $TargetFolderTextBox.Text)) {
+                if(!(Get-ChildItem $TargetFolderTextBox.Text -ErrorAction SilentlyContinue)) {
             
-                [System.Windows.MessageBox]::Show("The $($TargetFolderTextBox.Text) folder was successfully removed")
+                [System.Windows.MessageBox]::Show("The $($TargetFolderTextBox.Text) folder was successfully removed!")
             
                 }  
                 
                 else {
                 
-                [System.Windows.MessageBox]::Show("The $($TargetFolderTextBox.Text) folder was not removed")
+                [System.Windows.MessageBox]::Show("The $($TargetFolderTextBox.Text) folder was not removed!")
                 
                 }   
 
@@ -4323,36 +4416,91 @@ $VMBuildoutForm.StartPosition = 'CenterScreen'
         $AddVMToListButton.Enabled = $False
             $AddVMToListButton.Add_Click({
             
+            $AllExistingVMs = (Get-XenVM | where {$_.is_a_template -eq $False -and $_.name_label -notmatch "Control domain"}).name_label
+            $NotAddedVMs = $Null
+            $DuplicateNames = $False
+            $CurentCount = $NewVMHostnameListBox.Items.Count
+
             $NewVMHostnames = $NewVMHostnameTextBox.text
-            
-                if($NewVMHostnameTextBox.text -match ",") {
-            
-                $NewVMHostnames = $NewVMHostnameTextBox.text.split(",")
-            
+
+                if($NewVMHostnameTextBox.text -match "," -and $NewVMHostnameTextBox.text -match ";") {
+                
+                [System.Windows.MessageBox]::Show("Error in VM Host Name TextBox: Only use commas or semi-colons, not both")
+                       
                 }
 
-                if($NewVMHostnameTextBox.text -match ";") {
+                else {
             
-                $NewVMHostnames = $NewVMHostnameTextBox.text.split(";")
+                    if($NewVMHostnameTextBox.text -match ",") {
+                
+                    $NewVMHostnames = $NewVMHostnameTextBox.text.split(",")
             
-                }
+                    }
 
-                foreach($VMHostname in $NewVMHostnames) {
-
-                $NewVMHostnameListBox.Items.Add($VMHostname)
-
-                }
+                    if($NewVMHostnameTextBox.text -match ";") {
             
-                if($DropDownStorage.SelectedItem -ne $null) {
+                    $NewVMHostnames = $NewVMHostnameTextBox.text.split(";")
+            
+                    }
 
-                GetDiskSize
+                    foreach($VMHostname in $NewVMHostnames) {
+                    
+                        if(($NewVMHostnames | where {$_ -match $VMHostname}).Count -ge 2) {
+                        
+                        $DuplicateNames = $True
+                        
+                        }
+                                        
+                    }
+
+                    if($DuplicateNames -eq $False) {
+
+                        foreach($VMHostname in $NewVMHostnames) {
+
+                            if($AllExistingVMs -notcontains $VMHostname) {
+
+                            $NewVMHostnameListBox.Items.Add($VMHostname)
+
+                            }
+
+                            else {
+                    
+                            $NotAddedVMs += "$VMHostname`n"
+                    
+                            }
+
+                        }
+
+                        if($NotAddedVMs -ne $Null) {
+                
+                        [System.Windows.MessageBox]::Show("Error in VM Host Name TextBox: The following server names already exist in XenCenter and were not added as a result:`n`n$NotAddedVMs")
+                                
+                        }
+
+                        if($CurentCount -ne $NewVMHostnameListBox.Items.Count) {
+                        
+                            if($DropDownStorage.SelectedItem -ne $Null) {
+
+                            GetDiskSize
+
+                            }
+
+                        GetRAM
+
+                        $NewVMHostnameTextBox.Clear()
+                        $CreateNewVMButton.Enabled = $False                        
+                        
+                        }
+
+                    }
+
+                    else {
+                    
+                    [System.Windows.MessageBox]::Show("Error in VM Host Name TextBox: Duplicate names discovered, remove them to continue")
+                           
+                    }
 
                 }
-
-            GetRAM
-
-            $NewVMHostnameTextBox.Clear()
-            $CreateNewVMButton.Enabled = $False
 
             })
         $VMBuildoutForm.Controls.Add($AddVMToListButton)
@@ -4673,6 +4821,7 @@ $CreateAdditionalVMsForm.StartPosition = 'CenterScreen'
                 }
             
             $VMBuildoutForm.ClientSize = new-object System.Drawing.Size(300,465)
+            $Global:StopWatch.Reset()
 
             $CreateAdditionalVMsForm.Close()
 
@@ -4768,7 +4917,7 @@ Function StatusForm {
 
 $StatusForm = New-Object system.Windows.Forms.Form
 $StatusForm.Text = "AXL"
-$StatusForm.ClientSize = new-object System.Drawing.Size(390,350)
+$StatusForm.ClientSize = new-object System.Drawing.Size(390,355)
 $StatusForm.FormBorderStyle = 'Fixed3D'
 $StatusForm.MaximizeBox = $False
 $StatusForm.StartPosition = 'CenterScreen'
@@ -4807,9 +4956,9 @@ $StatusForm.StartPosition = 'CenterScreen'
             $CheckStatusButton.Add_Click({
 
             $CheckStatusButton.visible = $False
-            $ServerStatusLabel.Size = new-object System.Drawing.Size(370,40)
+            $ServerStatusLabel.Size = new-object System.Drawing.Size(370,60)
             CheckServerIPState
-            Start-Sleep -s 15
+            WaitScript 15
             CompleteBuildout
             $ServerStatusLabel.Size = new-object System.Drawing.Size(370,20)
             $CompleteStatusButton.visible = $True
@@ -5398,11 +5547,11 @@ Function UserGroupOUForm {
 
 $Global:BaseDN = ""
 
-foreach($Split in $DomainNameTextBox.Text.Split(".")) {
+    foreach($Split in $DomainNameTextBox.Text.Split(".")) {
 
-$Global:BaseDN += "DC=$Split,"
+    $Global:BaseDN += "DC=$Split,"
 
-}
+    }
 
 $Global:BaseDN = $Global:BaseDN.Remove($Global:BaseDN.Length-1)
 
@@ -5590,6 +5739,8 @@ $UserGroupOUForm.StartPosition = 'CenterScreen'
                 if($UsersListBox.SelectedItem -and $FirstNameTextBox.Text.Length -ge 1) {
 
                 $Global:UserFirstName[$UsersListBox.SelectedIndex] = $FirstNameTextBox.Text
+                $UsersListBox.Items[$UsersListBox.SelectedIndex] = "$($FirstNameTextBox.Text) $($LastNameTextBox.Text)"
+                $FirstNameTextBox.SelectionStart = $FirstNameTextBox.Text.Length + 1
 
                 }
                         
@@ -5605,6 +5756,8 @@ $UserGroupOUForm.StartPosition = 'CenterScreen'
                 if($UsersListBox.SelectedItem -and $LastNameTextBox.Text.Length -ge 1) {
 
                 $Global:UserLastName[$UsersListBox.SelectedIndex] = $LastNameTextBox.Text
+                $UsersListBox.Items[$UsersListBox.SelectedIndex] = "$($FirstNameTextBox.Text) $($LastNameTextBox.Text)"
+                $LastNameTextBox.SelectionStart = $LastNameTextBox.Text.Length + 1
 
                 }
                         
@@ -5620,8 +5773,6 @@ $UserGroupOUForm.StartPosition = 'CenterScreen'
                 if($UsersListBox.SelectedItem -and $LoginNameTextBox.Text.Length -ge 1) {
 
                 $Global:UserLoginName[$UsersListBox.SelectedIndex] = $LoginNameTextBox.Text
-                $UsersListBox.Items[$UsersListBox.SelectedIndex] = $LoginNameTextBox.Text
-                $LoginNameTextBox.SelectionStart = $LoginNameTextBox.Text.Length + 1
 
                 }        
         
@@ -5672,12 +5823,13 @@ $UserGroupOUForm.StartPosition = 'CenterScreen'
                 if($OUStructureListBox.SelectedItem -ne $DomainNameTextBox.Text) {
 
                 $SelectedOU = $DropDownParentOU.Text
+                $SelectedLocation = ($Global:OULocation[($OUStructureListBox.SelectedIndex-1)]).Split(",",2)[1]
                 $OUsToRemove = @()
                 $IndexesToRemove = @()
-
+                
                     foreach($RemovedOU in $Global:OULocation) {
 
-                        if($RemovedOU -match $SelectedOU -and $RemovedOU -match $DropDownParentOU.Text) {
+                        if($RemovedOU -match $SelectedOU -and $RemovedOU -match $SelectedLocation) {
                         
                         $OUsToRemove += $RemovedOU
                         $IndexesToRemove += ($Global:OULocation.IndexOf($RemovedOU)+1)
