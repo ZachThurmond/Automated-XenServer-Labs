@@ -102,7 +102,7 @@
                 </SynchronousCommand>
                 <SynchronousCommand wcm:action="add">
                     <Order>2</Order>
-                    <CommandLine>C:\Windows\SysWOW64\cmd /c PowerShell -Command "if(Get-ChildItem D:\1XenToolsPath){Start-Process msiexec.exe -Wait -ArgumentList /i,"D:\1XenToolsPath\managementagentx64.msi",/passive ;Shutdown -r -t 60}"</CommandLine>
+                    <CommandLine>C:\Windows\SysWOW64\cmd /c PowerShell -Command "Start msiexec.exe -Wait -ArgumentList /i,"D:\1XenToolsPath\managementagentx64.msi",/passive"</CommandLine>
                 </SynchronousCommand>
             </FirstLogonCommands>
         </component>
