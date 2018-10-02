@@ -824,7 +824,7 @@ $ArgumentList = "-b$BootFile -u2 -h -m $TargetFolder `"$($SelectedISO.Remove($Se
 $ISOCopyProgressLabel.Text = "Creating $NewISOName.iso at $($SelectedISO.Remove($SelectedISO.LastIndexOf("\")))\"
 
 # Create Custom ISO file. This turns the folder that contains the ISO and unattend into a new ISO file
-Start-Process -FilePath $ISOTool -ArgumentList $ArgumentList -WindowStyle Hidden
+Start-Process -FilePath $ISOTool -ArgumentList $ArgumentList -WindowStyle Hidden -Wait
 
 $Global:ISOCreationFormRan = $True
 
@@ -1659,7 +1659,6 @@ $ListViewCount = $CheckStateListView.Items.Count
 
 $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningCount/$ListViewCount Complete `n`nNote: This Can Take up to 1.5 Hours to Complete`nElapsed Time: $($Global:StopWatch.Elapsed.Hours):$($Global:StopWatch.Elapsed.Minutes):$($Global:StopWatch.Elapsed.Seconds)"
 
-    
     While($RunningCount -lt $ListViewCount) {
 
         foreach($RunningJob in $Global:GetVMIPs){
@@ -1712,7 +1711,7 @@ $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningC
 
             }
             
-            if((((Get-date) - $Global:StartTime).hours -eq 1) -and (((Get-date) - $Global:StartTime).Minutes -eq 12) -and (!((Get-XenVM -Name $RunningJob.Name | Select -ExpandProperty guest_metrics | Get-XenVMGuestMetrics).networks.'0/ipv4/0')) -and ($NeededReboot[($Global:AllCreatedServers | sort).IndexOf($RunningJob.Name)] -eq $False)) {
+            if((Get-XenVM -Name $RunningJob.Name).allowed_operations -contains "clean_reboot" -and (!((Get-XenVM -Name $RunningJob.Name | Select -ExpandProperty guest_metrics | Get-XenVMGuestMetrics).networks.'0/ipv4/0')) -and ($NeededReboot[($Global:AllCreatedServers | sort).IndexOf($RunningJob.Name)] -eq $False)) {
             
                 Start-Job -ScriptBlock {
             
@@ -1728,28 +1727,7 @@ $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningC
             
                 } -ArgumentList $RunningJob.Name,$Global:XenServerModule,$XenHostTextBox.Text,$UsernameTextBox.Text,$PasswordTextBox.Text
            
-            $NeededReboot.Insert(($Global:AllCreatedServers | sort).IndexOf($RunningJob.Name),$True)
-
-            }
-
-
-            if((((Get-date) - $Global:StartTime).hours -eq 1) -and (((Get-date) - $Global:StartTime).Minutes -eq 16) -and (!((Get-XenVM -Name $RunningJob.Name | Select -ExpandProperty guest_metrics | Get-XenVMGuestMetrics).networks.'0/ipv4/0')) -and ($NeededReboot[($Global:AllCreatedServers | sort).IndexOf($RunningJob.Name)] -eq $True)) {
-            
-                Start-Job -ScriptBlock {
-            
-                param ($RunningJob,$XenServerModule,$XenHost,$Username,$Password)
-
-                Import-Module $XenServerModule
-
-                $XenSession = Connect-XenServer -Url "https://$XenHost" -UserName $Username -Password $Password -NoWarnCertificates -SetDefaultSession
-
-                Invoke-XenVM -Name $RunningJob -XenAction CleanReboot
-
-                $XenSession | Disconnect-XenServer
-            
-                } -ArgumentList $RunningJob.Name,$Global:XenServerModule,$XenHostTextBox.Text,$UsernameTextBox.Text,$PasswordTextBox.Text
-
-            $NeededReboot.Insert(($Global:AllCreatedServers | sort).IndexOf($RunningJob.Name),$null)
+            $NeededReboot[($Global:AllCreatedServers | sort).IndexOf($RunningJob.Name)] = $True
 
             }
             
