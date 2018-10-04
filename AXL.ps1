@@ -67,10 +67,15 @@ Function CheckServerOnState([string] $CheckComputer) {
 
     while(!(Test-Connection -ComputerName $CheckComputer -Count 1 -ErrorAction SilentlyContinue)) {
 
-    WaitScript 1
-    [System.Windows.Forms.Application]::DoEvents()
+    WaitScript 3
 
     }
+
+   # While(!(Test-WSMan -ComputerName $CheckComputer -ErrorAction SilentlyContinue)) {
+
+   # WaitScript 3
+    
+   # }
 
 }
 
@@ -3145,10 +3150,11 @@ $VMStatusTextBox.AppendText("`r`nStarting Complete Buildout")
 $VMStatusTextBox.AppendText("`r`n=========================`r`n")
 
 $WinRMPreviouslyStarted = $False
-$PreviousTrustedHostValue = $null
+$PreviousTrustedHostValue = $Null
 
 #Start WinRM service for remote powershell if not already started
     if((Get-Service WinRM).Status -eq "Stopped") {
+
     $VMStatusTextBox.AppendText("`r`nStarting the WinRM Service")
     Get-Service WinRM | Start-Service -Confirm:$False
 
@@ -3161,13 +3167,9 @@ $PreviousTrustedHostValue = $null
     }
 
 #Change trusted hosts file to allow for remote PowerShell Using IP addresses
-    if((Get-Item wsman:\localhost\Client\TrustedHosts).Value -ne [regex]"\*") {
+    if((Get-Item wsman:\localhost\Client\TrustedHosts).Value -notmatch [regex]"\*") {
 
-        if((Get-Item wsman:\localhost\Client\TrustedHosts).Value) {
-        
-        $PreviousTrustedHostValue = (Get-Item wsman:\localhost\Client\TrustedHosts).Value
-
-        }
+    $PreviousTrustedHostValue = (Get-Item wsman:\localhost\Client\TrustedHosts).Value
     $VMStatusTextBox.AppendText("`r`nModifying the Trusted Hosts File to Allow for Remote PoSH")
     Start-Process PowerShell -Verb RunAs -ArgumentList {Set-Item wsman:\localhost\Client\TrustedHosts -value * -Confirm:$False -Force} -WindowStyle Hidden
 
@@ -3198,14 +3200,16 @@ DomainCreation
     }
 
 #Reset Trusted Hosts file to default of Null, or, if previously conigured, change it back to that configuration 
-    if($PreviousTrustedHostValue) {
+    if($PreviousTrustedHostValue -ne $Null -or $PreviousTrustedHostValue -notmatch [regex]"\*") {
 
+    $VMStatusTextBox.AppendText("`r`nReverting the Trusted Hosts File Value")
     Start-Process PowerShell -Verb RunAs -ArgumentList ("`$PreviousTrustedHostValue = '$PreviousTrustedHostValue';" + {Set-Item wsman:\localhost\Client\TrustedHosts -value $PreviousTrustedHostValue -Confirm:$False -Force}) -WindowStyle Hidden
 
     }
     
     else {
 
+    $VMStatusTextBox.AppendText("`r`nReverting the Trusted Hosts File Value to Null")
     Start-Process PowerShell -Verb RunAs -ArgumentList {Clear-Item "wsman:\localhost\Client\TrustedHosts" -Force} -WindowStyle Hidden
  
     }
@@ -3213,6 +3217,7 @@ DomainCreation
 #Stop WinRM service if it wasn't already started
     if($WinRMPreviouslyStarted -eq $False) {
     
+    $VMStatusTextBox.AppendText("`r`nStopping the WinRM Service")
     Get-Service WinRM | Stop-Service -Confirm:$False
 
     }
@@ -3225,7 +3230,7 @@ DomainCreation
 
     Get-Job | Remove-Job
 
-$ServerStatusLabel.Text = "Click 'Complete' Exit"
+$ServerStatusLabel.Text = "Click 'Complete' to Exit"
 
 }
 
