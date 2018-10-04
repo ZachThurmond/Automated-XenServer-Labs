@@ -67,15 +67,10 @@ Function CheckServerOnState([string] $CheckComputer) {
 
     while(!(Test-Connection -ComputerName $CheckComputer -Count 1 -ErrorAction SilentlyContinue)) {
 
-    WaitScript 3
+    WaitScript 1
+    [System.Windows.Forms.Application]::DoEvents()
 
     }
-
-   # While(!(Test-WSMan -ComputerName $CheckComputer -ErrorAction SilentlyContinue)) {
-
-   # WaitScript 3
-    
-   # }
 
 }
 
