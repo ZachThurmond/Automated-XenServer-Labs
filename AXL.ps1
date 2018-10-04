@@ -67,14 +67,9 @@ Function CheckServerOnState([string] $CheckComputer) {
 
     while(!(Test-Connection -ComputerName $CheckComputer -Count 1 -ErrorAction SilentlyContinue)) {
 
-    WaitScript 3
+    WaitScript 1
+    [System.Windows.Forms.Application]::DoEvents()
 
-    }
-
-    While(!(Test-WSMan -ComputerName $CheckComputer -ErrorAction SilentlyContinue)) {
-
-    WaitScript 3
-    
     }
 
 }
@@ -167,7 +162,7 @@ $ModuleValidationCount = 0
 Function ConnectToXenHost {
 
     Try {
-
+    
     $Global:Session = Connect-XenServer -Url "https://$($XenHostTextBox.Text)" -UserName $UsernameTextBox.Text -Password $PasswordTextBox.Text -NoWarnCertificates -SetDefaultSession
 
     } 
@@ -1266,7 +1261,7 @@ Function ChangeIPAddresses {
 
         } -ArgumentList $NewIPAddress, $PrefixLength, $DefaultGateway, $DNSServers -AsJob
     
-    WaitScript 2
+    WaitScript 5
 
     }
 
@@ -1647,13 +1642,11 @@ Function CheckServerIPState {
 
 $RunningCount = 0
 [System.Collections.ArrayList]$NeededReboot = @()
-$RebootCounter = 0
 $ListViewCount = $CheckStateListView.Items.Count
 
-    while($RebootCounter -lt $Global:AllCreatedServers.Count) {
+    while($NeededReboot.Count -ne $Global:AllCreatedServers.Count) {
     
     $NeededReboot += $False
-    $RebootCounter++
 
     }
 
@@ -1661,14 +1654,30 @@ $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningC
 
     While($RunningCount -lt $ListViewCount) {
 
-        foreach($RunningJob in $Global:GetVMIPs){
+        foreach($RunningJob in $Global:GetVMIPs) {
+
+            if(((Get-XenVM -Name $RunningJob.Name).allowed_operations -contains "clean_reboot") -and (!((Get-XenVM -Name $RunningJob.Name | Select -ExpandProperty guest_metrics | Get-XenVMGuestMetrics).networks.'0/ipv4/0')) -and ($NeededReboot[($Global:AllCreatedServers | sort).IndexOf($RunningJob.Name)] -eq $False)) {
+
+            $NeededReboot[($Global:AllCreatedServers | sort).IndexOf($RunningJob.Name)] = $True
+
+                $RebootServer = Start-Job -ScriptBlock {
+            
+                param ($RunningJob,$XenServerModule,$XenHost,$Username,$Password)
+
+                Import-Module $XenServerModule
+
+                Connect-XenServer -Url "https://$XenHost" -UserName $Username -Password $Password -NoWarnCertificates -SetDefaultSession
+
+                Invoke-XenVM -Name $RunningJob -XenAction CleanReboot
+            
+                } -ArgumentList $RunningJob.Name,$Global:XenServerModule,$XenHostTextBox.Text,$UsernameTextBox.Text,$PasswordTextBox.Text
+
+            }
 
             if((Get-Job $RunningJob.Name -ErrorAction SilentlyContinue).State -eq "Completed" -and ((Get-XenVM -Name $RunningJob.Name | Select -ExpandProperty guest_metrics | Get-XenVMGuestMetrics).networks.'0/ipv4/0') -and ((Get-XenVM -Name $RunningJob.Name | Select -ExpandProperty guest_metrics | Get-XenVMGuestMetrics).networks.'0/ipv4/0') -notmatch "169.254") {
             
             $RunningCount++
             $CurrentIPAddress = (Get-XenVM -Name $RunningJob.Name | Select -ExpandProperty guest_metrics | Get-XenVMGuestMetrics).networks.'0/ipv4/0'
-
-            $NeededReboot.Insert(($Global:AllCreatedServers | sort).IndexOf($RunningJob.Name),$False)
             $CheckStateListView.Items.RemoveAt($CheckStateListView.Items.Text.IndexOf($RunningJob.Name))
 
             $ListViewItem = New-Object System.Windows.Forms.ListViewItem($RunningJob.Name)
@@ -1680,7 +1689,7 @@ $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningC
 
                 if(Get-Job $RunningJob.Name -ErrorAction SilentlyContinue) {
 
-                    Remove-Job -Name $RunningJob.Name -Force
+                Remove-Job -Name $RunningJob.Name -Force
 
                 }
 
@@ -1691,7 +1700,6 @@ $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningC
             elseif((Get-Job $RunningJob.Name -ErrorAction SilentlyContinue).State -eq "Failed"){
             
             $RunningCount++
-            $NeededReboot.Insert(($Global:AllCreatedServers | sort).IndexOf($RunningJob.Name),$False)
             $CheckStateListView.Items.RemoveAt($CheckStateListView.Items.Text.IndexOf($RunningJob.Name))
 
             $ListViewItem = New-Object System.Windows.Forms.ListViewItem($RunningJob.Name)
@@ -1703,36 +1711,19 @@ $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningC
 
                 if(Get-Job $RunningJob.Name -ErrorAction SilentlyContinue) {
 
-                    Remove-Job -Name $RunningJob.Name -Force
+                Remove-Job -Name $RunningJob.Name -Force
 
                 }
 
             $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningCount/$ListViewCount Complete `n`nNote: This Can Take up to 1.5 Hours to Complete`nElapsed Time: $($Global:StopWatch.Elapsed.Hours):$($Global:StopWatch.Elapsed.Minutes):$($Global:StopWatch.Elapsed.Seconds)"
 
             }
-            
-            if((Get-XenVM -Name $RunningJob.Name).allowed_operations -contains "clean_reboot" -and (!((Get-XenVM -Name $RunningJob.Name | Select -ExpandProperty guest_metrics | Get-XenVMGuestMetrics).networks.'0/ipv4/0')) -and ($NeededReboot[($Global:AllCreatedServers | sort).IndexOf($RunningJob.Name)] -eq $False)) {
-            
-                Start-Job -ScriptBlock {
-            
-                param ($RunningJob,$XenServerModule,$XenHost,$Username,$Password)
 
-                Import-Module $XenServerModule
+        $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningCount/$ListViewCount Complete `n`nNote: This Can Take up to 1.5 Hours to Complete`nElapsed Time: $($Global:StopWatch.Elapsed.Hours):$($Global:StopWatch.Elapsed.Minutes):$($Global:StopWatch.Elapsed.Seconds)"
+        $ServerStatusLabel.Refresh()
 
-                $XenSession = Connect-XenServer -Url "https://$XenHost" -UserName $Username -Password $Password -NoWarnCertificates -SetDefaultSession
-
-                Invoke-XenVM -Name $RunningJob -XenAction CleanReboot
-
-                $XenSession | Disconnect-XenServer
-            
-                } -ArgumentList $RunningJob.Name,$Global:XenServerModule,$XenHostTextBox.Text,$UsernameTextBox.Text,$PasswordTextBox.Text
-           
-            $NeededReboot[($Global:AllCreatedServers | sort).IndexOf($RunningJob.Name)] = $True
-
-            }
-            
         }
-    
+
     Start-Sleep -Milliseconds 200
     [System.Windows.Forms.Application]::DoEvents()
     $ServerStatusLabel.Text = "Waiting for Servers to Obtain IP Addresses: $RunningCount/$ListViewCount Complete `n`nNote: This Can Take up to 1.5 Hours to Complete`nElapsed Time: $($Global:StopWatch.Elapsed.Hours):$($Global:StopWatch.Elapsed.Minutes):$($Global:StopWatch.Elapsed.Seconds)"
@@ -6311,7 +6302,7 @@ $CertificateBuildoutForm.StartPosition = 'CenterScreen'
         $HashAlgorithmLabel = New-Object System.Windows.Forms.Label
         $HashAlgorithmLabel.Text = "Hash Algorithm:"
         $HashAlgorithmLabel.AutoSize = $True
-        $HashAlgorithmLabel.Location = new-object System.Drawing.Size(290,250)
+        $HashAlgorithmLabel.Location = new-object System.Drawing.Size(280,250)
         $CertificateBuildoutForm.Controls.Add($HashAlgorithmLabel) 
              
 
@@ -6566,16 +6557,14 @@ $CertificateBuildoutForm.StartPosition = 'CenterScreen'
 
                 }
 
-            $DropDownParentCA.Items.Clear()
-
-                foreach($ParentCA in ($Global:CATypes | where { $_ -notmatch "Subordinate" -and $_ -ne $Null})) {
-            
-                $DropDownParentCA.Items.Add($CertificateAuthoritiesListBox.Items[$Global:CATypes.IndexOf($ParentCA)])
-            
-                }
-
                 if($Global:CATypes[$CertificateAuthoritiesListBox.SelectedIndex] -match "Subordinate") {
-            
+                
+                    if($DropDownParentCA.Items -contains $CertificateAuthoritiesListBox.SelectedItem) {
+
+                    $DropDownParentCA.Items.Remove($CertificateAuthoritiesListBox.SelectedItem)
+
+                    }
+
                 $DropDownParentCA.Enabled = $True
                 $DropDownCryptoProvider.Enabled = $False
                 $DropDownKeyLength.Enabled = $False
@@ -6591,6 +6580,12 @@ $CertificateBuildoutForm.StartPosition = 'CenterScreen'
                 }
 
                 else {
+
+                    if($DropDownParentCA.Items -notcontains $CertificateAuthoritiesListBox.SelectedItem) {
+
+                    $DropDownParentCA.Items.Add($CertificateAuthoritiesListBox.SelectedItem)
+
+                    }
 
                 $DropDownParentCA.ResetText()
                 $DropDownCryptoProvider.Enabled = $True

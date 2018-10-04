@@ -98,11 +98,7 @@
             <FirstLogonCommands>
                 <SynchronousCommand wcm:action="add">
                     <Order>1</Order>
-                    <CommandLine>C:\Windows\SysWOW64\cmd /c PowerShell -Command "Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False"</CommandLine>
-                </SynchronousCommand>
-                <SynchronousCommand wcm:action="add">
-                    <Order>2</Order>
-                    <CommandLine>C:\Windows\SysWOW64\cmd /c PowerShell -Command "Start msiexec.exe -Wait -ArgumentList /i,"D:\1XenToolsPath\managementagentx64.msi",/passive"</CommandLine>
+                    <CommandLine>C:\Windows\SysWOW64\cmd /c PowerShell -Command "Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False;Start msiexec.exe -Wait -ArgumentList /i,"D:\1XenToolsPath\managementagentx64.msi",/passive"</CommandLine>
                 </SynchronousCommand>
             </FirstLogonCommands>
         </component>
