@@ -55,10 +55,8 @@ Add-Type -AssemblyName System.Windows.Forms
 $Global:StopWatch = New-Object -TypeName System.Diagnostics.Stopwatch 
 $Global:XenServerModule = (Get-ChildItem (Get-Location) -Recurse -ErrorAction SilentlyContinue | where {$_.Name -eq "XenServerPowerShell.dll"}).FullName 
 $Global:ISOCreationFormRan = $False
-$Global:IPCounter = 0
 $Global:CACounter = 0
 $Global:PreviouslySelectedIndex = 0
-$Global:RunOnce = $False
 
 
 #################################  GENERAL FUNCTIONS  #################################
@@ -1480,14 +1478,13 @@ Function PopulateUsernameAndPassword {
 
 Function DefinePreviouslySelectedIndex {
 
-    while($Global:IPCounter -lt $IPSchemaListBox.Items.Count) {
+    while($Global:IPAddresses.Count -lt $IPSchemaListBox.Items.Count) {
     
     $Global:DefaultGateways += $null
     $Global:SubnetMasks += $null
     $Global:IPAddresses += $null
     $Global:PrimaryDNSServers += $null
     $Global:SecondaryDNSServers += $null
-    $Global:IPCounter++
 
     }
 
@@ -6504,13 +6501,10 @@ $CertificateBuildoutForm.StartPosition = 'CenterScreen'
                 $CertificateAuthoritiesListBox.ClearSelected()
 
                 $ListedServers = @()
-                $Counter = 0
                 
-                    while($Counter -lt $AllCertificateServersListBox.Items.Count) {
+                    while($ListedServers.Count -lt $AllCertificateServersListBox.Items.Count) {
                 
                     $ListedServers += $AllCertificateServersListBox.Items[$Counter]
-
-                    $Counter++
                     
                     }
 
@@ -6820,13 +6814,6 @@ $CertificateBuildoutForm.StartPosition = 'CenterScreen'
 
             })
         $CertificateBuildoutForm.Controls.Add($OnlineResponderCheckbox)
-        
-
-    if($Global:RunOnce -eq $False) {
-
-    $Global:RunOnce = $True
-
-    }
 
     if($Global:CAServers.Count -ge 1) {
 
