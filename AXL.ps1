@@ -1822,7 +1822,7 @@ WaitScript 10
 
     }
 
-WaitScript 10
+WaitScript 40
 
 JoinToDomain
 
@@ -5688,7 +5688,6 @@ $UserGroupOUForm.StartPosition = 'CenterScreen'
 
                 $Global:GroupName[$GroupsListBox.SelectedIndex] = $GroupNameTextBox.Text
                 $GroupsListBox.Items[$GroupsListBox.SelectedIndex] = $GroupNameTextBox.Text
-                $GroupNameTextBox.SelectionStart = $GroupNameTextBox.Text.Length + 1
 
                 }
                         
@@ -5705,7 +5704,6 @@ $UserGroupOUForm.StartPosition = 'CenterScreen'
 
                 $Global:UserFirstName[$UsersListBox.SelectedIndex] = $FirstNameTextBox.Text
                 $UsersListBox.Items[$UsersListBox.SelectedIndex] = "$($FirstNameTextBox.Text) $($LastNameTextBox.Text)"
-                $FirstNameTextBox.SelectionStart = $FirstNameTextBox.Text.Length + 1
 
                 }
                         
@@ -5722,7 +5720,6 @@ $UserGroupOUForm.StartPosition = 'CenterScreen'
 
                 $Global:UserLastName[$UsersListBox.SelectedIndex] = $LastNameTextBox.Text
                 $UsersListBox.Items[$UsersListBox.SelectedIndex] = "$($FirstNameTextBox.Text) $($LastNameTextBox.Text)"
-                $LastNameTextBox.SelectionStart = $LastNameTextBox.Text.Length + 1
 
                 }
                         
