@@ -4382,8 +4382,10 @@ $VMBuildoutForm.StartPosition = 'CenterScreen'
             $AddVMToListButton.Add_Click({
             
             $AllExistingVMs = (Get-XenVM | where {$_.is_a_template -eq $False -and $_.name_label -notmatch "Control domain"}).name_label
-            $NotAddedVMs = $Null
+            $AlreadyExistingVMs = $Null
+            $AlreadyListedVMs = $Null
             $DuplicateNames = $False
+            $ListedDuplicates = @()
             $CurentCount = $NewVMHostnameListBox.Items.Count
 
             $NewVMHostnames = $NewVMHostnameTextBox.text
@@ -4413,7 +4415,8 @@ $VMBuildoutForm.StartPosition = 'CenterScreen'
                         if(($NewVMHostnames | where {$_ -match $VMHostname}).Count -ge 2) {
                         
                         $DuplicateNames = $True
-                        
+                        $ListedDuplicates += "$VMHostname`n"
+
                         }
                                         
                     }
@@ -4422,24 +4425,36 @@ $VMBuildoutForm.StartPosition = 'CenterScreen'
 
                         foreach($VMHostname in $NewVMHostnames) {
 
-                            if($AllExistingVMs -notcontains $VMHostname) {
+                            if($AllExistingVMs -notcontains $VMHostname -and $NewVMHostnameListBox.Items -notcontains $VMHostname) {
 
                             $NewVMHostnameListBox.Items.Add($VMHostname)
 
                             }
 
-                            else {
+                            elseif($NewVMHostnameListBox.Items -contains $VMHostname) {
+                            
+                            $AlreadyListedVMs += "$VMHostname`n"
+                            
+                            } 
+
+                            elseif($AllExistingVMs -contains $VMHostname) {
                     
-                            $NotAddedVMs += "$VMHostname`n"
+                            $AlreadyExistingVMs += "$VMHostname`n"
                     
                             }
 
                         }
 
-                        if($NotAddedVMs -ne $Null) {
+                        if($AlreadyExistingVMs -ne $Null) {
                 
-                        [System.Windows.MessageBox]::Show("Error in VM Host Name TextBox: The following server names already exist in XenCenter and were not added as a result:`n`n$NotAddedVMs")
+                        [System.Windows.MessageBox]::Show("Error in VM Host Name TextBox: The following server names already exist in XenCenter and were not added as a result:`n`n$AlreadyExistingVMs")
                                 
+                        }
+
+                        elseif($AlreadyListedVMs -ne $Null) {
+                        
+                        [System.Windows.MessageBox]::Show("Error in VM Host Name TextBox: The following server names are already listed and were not added as a result:`n`n$AlreadyListedVMs")
+                         
                         }
 
                         if($CurentCount -ne $NewVMHostnameListBox.Items.Count) {
@@ -4461,7 +4476,7 @@ $VMBuildoutForm.StartPosition = 'CenterScreen'
 
                     else {
                     
-                    [System.Windows.MessageBox]::Show("Error in VM Host Name TextBox: Duplicate names discovered, remove them to continue")
+                    [System.Windows.MessageBox]::Show("Error in VM Host Name TextBox: Duplicate names discovered, remove them to continue:`n`n$($ListedDuplicates | Get-Unique)")
                            
                     }
 
