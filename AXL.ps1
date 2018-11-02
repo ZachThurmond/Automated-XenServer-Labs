@@ -817,7 +817,7 @@ $ArgumentList = "-b$BootFile -u2 -h -m $TargetFolder `"$($SelectedISO.Remove($Se
 $ISOCopyProgressLabel.Text = "Creating $NewISOName.iso at $($SelectedISO.Remove($SelectedISO.LastIndexOf("\")))\"
 
 # Create Custom ISO file. This turns the folder that contains the ISO and unattend into a new ISO file
-Start-Process -FilePath $ISOTool -ArgumentList $ArgumentList -Wait
+Start-Process -FilePath $ISOTool -ArgumentList $ArgumentList -WindowStyle Hidden -Wait
 
 $Global:ISOCreationFormRan = $True
 
@@ -3072,7 +3072,7 @@ $VMStatusTextBox.AppendText("`r`n")
 
 Function DFSCreation {
 
-$ServerStatusLabel.Text = "Starting Certificate Authority Creation `n`nNote: This Will Take About 2-10 Minutes to Complete"
+$ServerStatusLabel.Text = "Starting DFS Creation `n`nNote: This Will Take About 2-10 Minutes to Complete"
 
 $VMStatusTextBox.AppendText("`r`n=========================")
 $VMStatusTextBox.AppendText("`r`nStarting DFS Creation")
