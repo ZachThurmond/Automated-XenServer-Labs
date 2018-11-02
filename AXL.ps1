@@ -817,7 +817,7 @@ $ArgumentList = "-b$BootFile -u2 -h -m $TargetFolder `"$($SelectedISO.Remove($Se
 $ISOCopyProgressLabel.Text = "Creating $NewISOName.iso at $($SelectedISO.Remove($SelectedISO.LastIndexOf("\")))\"
 
 # Create Custom ISO file. This turns the folder that contains the ISO and unattend into a new ISO file
-Start-Process -FilePath $ISOTool -ArgumentList $ArgumentList -WindowStyle Hidden -Wait
+Start-Process -FilePath $ISOTool -ArgumentList $ArgumentList -Wait
 
 $Global:ISOCreationFormRan = $True
 
